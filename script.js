@@ -663,6 +663,89 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     };
 
+    // Draw Load button functionality
+    document.getElementById('draw-load-btn').onclick = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,.txt,application/json';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = evt => {
+                try {
+                    const loaded = JSON.parse(evt.target.result);
+                    // Load mazeWalls
+                    if (loaded && Array.isArray(loaded.mazeWalls)) {
+                        // Clear previous draw grid
+                        drawGrid.innerHTML = '';
+                        drawTiles = [];
+                        drawSelected = null;
+                        // Rebuild draw grid from loaded mazeWalls
+                        for (let row = 0; row < size; row++) {
+                            for (let col = 0; col < size; col++) {
+                                const tile = document.createElement('div');
+                                tile.className = 'tile revealed';
+                                tile.dataset.row = row;
+                                tile.dataset.col = col;
+                                // Label start/end
+                                if (row === size - 1 && col === Math.floor(size / 2)) {
+                                    tile.textContent = 'START';
+                                    tile.style.background = 'pink';
+                                    tile.style.color = '#000';
+                                } else if (row === 0 && col === Math.floor(size / 2)) {
+                                    tile.textContent = 'END';
+                                    tile.style.background = '#e53935';
+                                    tile.style.color = '#fff';
+                                } else {
+                                    tile.textContent = row * size + col + 1;
+                                }
+                                // Set walls
+                                const wallObj = loaded.mazeWalls.find(w => w.row === row && w.col === col);
+                                if (wallObj) {
+                                    if (wallObj.walls.top) tile.classList.add('wall-top');
+                                    if (wallObj.walls.right) tile.classList.add('wall-right');
+                                    if (wallObj.walls.bottom) tile.classList.add('wall-bottom');
+                                    if (wallObj.walls.left) tile.classList.add('wall-left');
+                                }
+                                tile.onclick = () => handleDrawTileClick(tile, row, col);
+                                tile.oncontextmenu = (e) => handleDrawTileRightClick(e, tile);
+                                drawTiles.push(tile);
+                                drawGrid.appendChild(tile);
+                            }
+                        }
+                        // Restore boobytraps
+                        if (loaded.boobytraps && Array.isArray(loaded.boobytraps)) {
+                            for (const b of loaded.boobytraps) {
+                                const i = b.row * size + b.col;
+                                if (drawTiles[i]) drawTiles[i].classList.add('boobytrap');
+                            }
+                        }
+                        // Restore draw-mode task descriptions
+                        if (loaded.tileDescriptions && typeof loaded.tileDescriptions === 'object') {
+                            for (const [key, value] of Object.entries(loaded.tileDescriptions)) {
+                                localStorage.setItem('draw_tile_desc_' + key, value);
+                            }
+                        }
+                        // Restore trap descriptions
+                        if (loaded.trapDescriptions && typeof loaded.trapDescriptions === 'object') {
+                            for (const [key, value] of Object.entries(loaded.trapDescriptions)) {
+                                localStorage.setItem('draw_trap_desc_' + key, value);
+                            }
+                        }
+                    } else {
+                        alert('Invalid draw-maze file.');
+                        return;
+                    }
+                } catch (err) {
+                    alert('Failed to load draw-maze: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    };
+
     // Initial grid
     createGrid();
     // Initial overview

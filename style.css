@@ -1,0 +1,284 @@
+body {
+    background: #f0f0f0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    position: relative;
+    background: #fff;
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+}
+
+.main-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+    flex-direction: row-reverse;
+}
+
+.button-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 0;
+    margin-left: 0;
+}
+
+.button-panel button {
+    width: 100px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+}
+
+.reset-btn, .fog-btn, .save-btn, .load-btn {
+    width: 100px;
+}
+
+.reset-btn {
+    position: static;
+    margin-top: 0;
+    margin-right: 0;
+    align-self: flex-start;
+    padding: 10px 20px;
+    background: #e53935;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+}
+
+.reset-btn:hover {
+    background: #c62828;
+}
+
+.fog-btn {
+    display: block;
+    margin-top: 16px;
+    padding: 10px 20px;
+    background: #2196f3;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+}
+
+.fog-btn:hover {
+    background: #1976d2;
+}
+
+.save-btn {
+    display: block;
+    margin-top: 16px;
+    padding: 10px 20px;
+    background: #4caf50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+}
+
+.save-btn:hover {
+    background: #388e3c;
+}
+
+.load-btn {
+    display: block;
+    margin-top: 16px;
+    padding: 10px 20px;
+    background: #ff9800;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+}
+
+.load-btn:hover {
+    background: #fb8c00;
+}
+
+#grid {
+    display: grid;
+    grid-template-columns: repeat(9, 60px);
+    grid-template-rows: repeat(9, 60px);
+    gap: 0;
+    position: relative;
+    margin-right: 20px;
+}
+
+#draw-grid {
+    display: grid;
+    grid-template-columns: repeat(9, 60px);
+    grid-template-rows: repeat(9, 60px);
+    gap: 0;
+    margin: 0 auto;
+}
+
+.tile {
+    background: #000; /* Hidden tiles are black */
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    border: 2px solid transparent;
+    box-sizing: border-box;
+}
+
+.tile:hover {
+    background: #388e3c;
+}
+
+.tile.revealed {
+    background: #90caf9; /* Light blue for revealed */
+    color: #000;
+}
+
+.tile.clicked {
+    background: #4caf50 !important; /* Green for completed */
+    color: #fff !important;
+}
+
+.tile.deadend.clicked {
+    background: orange !important;
+    color: #fff !important;
+}
+
+.tile.wall-top,
+.tile.wall-bottom,
+.tile.wall-left,
+.tile.wall-right {
+    /* Walls are invisible by default, only visible on revealed tiles */
+    border-color: transparent;
+}
+
+.tile.revealed.wall-top {
+    border-top: 4px solid #333;
+}
+.tile.revealed.wall-bottom {
+    border-bottom: 4px solid #333;
+}
+.tile.revealed.wall-left {
+    border-left: 4px solid #333;
+}
+.tile.revealed.wall-right {
+    border-right: 4px solid #333;
+}
+
+#main-container {
+    display: flex;
+    align-items: flex-start;
+}
+
+#overview-panel {
+    margin-right: 20px;
+    margin-bottom: 0;
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    min-height: 40px;
+    max-width: 120px;
+    word-break: break-word;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+#main-container > div {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.4);
+}
+.modal-content {
+  background-color: #fff;
+  margin: 10% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 350px;
+  border-radius: 8px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+  position: relative;
+}
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  position: absolute;
+  right: 16px;
+  top: 8px;
+}
+.close:hover,
+.close:focus {
+  color: #e53935;
+  text-decoration: none;
+  cursor: pointer;
+}
+#tasks-list {
+  margin-top: 20px;
+}
+.modal-content#draw-modal-content {
+  width: 650px;
+  max-width: 95vw;
+  min-width: 0;
+}
+#draw-modal .modal-content {
+  width: 650px;
+  max-width: 95vw;
+  min-width: 0;
+}
+
+.tile.boobytrap {
+    color: red !important;
+    font-weight: bold;
+}
+
+.tile.deadend.clicked.boobytrap {
+    color: red !important;
+    font-weight: bold;
+}

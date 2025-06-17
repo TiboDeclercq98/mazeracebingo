@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Bingo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="main-container" style="display: flex; align-items: flex-start;">
+        <!-- Overview panel will be inserted here by script.js -->
+        <div>
+            <div id="grid" class="grid"></div>
+            <div class="button-panel">
+                <button id="reset-btn">Reset</button>
+                <button id="fog-btn">Fog</button>
+                <button id="save-btn">Save</button>
+                <button id="load-btn">Load</button>
+                <button id="tasks-btn">Tasks</button>
+                <button id="traps-btn">Traps</button>
+                <button id="draw-popup-btn">Draw</button>
+            </div>
+            <!-- Modal for Tasks -->
+            <div id="tasks-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span class="close" id="close-tasks-modal">&times;</span>
+                    <h2>Tasks</h2>
+                    <div id="tasks-list">
+                        <!-- Tasks content will go here -->
+                    </div>
+                </div>
+            </div>
+            <!-- Modal for Draw -->
+            <div id="draw-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span class="close" id="close-draw-modal">&times;</span>
+                    <h2>Draw Mode</h2>
+                    <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 24px;">
+                        <div id="draw-grid" class="grid"></div>
+                        <div class="button-panel">
+                            <button id="draw-save-btn" class="save-btn">Save</button>
+                            <button id="draw-tasks-btn">Tasks</button>
+                            <button id="draw-traps-btn">Traps</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Modal for Draw Tasks -->
+                <div id="draw-tasks-modal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <span class="close" id="close-draw-tasks-modal">&times;</span>
+                        <h2>Tasks</h2>
+                        <div id="draw-tasks-list">
+                            <!-- Tasks content will go here -->
+                        </div>
+                    </div>
+                </div>
+                <!-- Modal for Draw Traps -->
+                <div id="draw-traps-modal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <span class="close" id="close-draw-traps-modal">&times;</span>
+                        <h2>Traps</h2>
+                        <div id="draw-traps-list">
+                            <!-- Traps content will go here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal for Real Maze Traps -->
+            <div id="traps-modal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span class="close" id="close-traps-modal">&times;</span>
+                    <h2>Traps</h2>
+                    <div id="traps-list">
+                        <!-- Traps content will go here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

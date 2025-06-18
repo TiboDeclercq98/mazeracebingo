@@ -6,6 +6,6 @@
     "puppeteer": "^24.10.1"
   },
   "scripts": {
-    "postinstall": "puppeteer install"
+    "postinstall": "puppeteer install && npx puppeteer browsers install chrome"
   }
 }

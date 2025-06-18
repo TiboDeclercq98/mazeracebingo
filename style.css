@@ -144,6 +144,7 @@ body {
 }
 
 .tile {
+    border: 1px solid #bbb;
     background: #000; /* Hidden tiles are black */
     color: #fff;
     display: flex;
@@ -210,7 +211,7 @@ body {
     border-radius: 6px;
     font-size: 0.95em;
     min-height: 40px;
-    max-width: 120px;
+    max-width: 400px;
     word-break: break-word;
     max-height: 80vh;
     overflow-y: auto;
@@ -281,4 +282,8 @@ body {
 .tile.deadend.clicked.boobytrap {
     color: red !important;
     font-weight: bold;
+}
+
+.button-panel.hide-for-screenshot {
+    display: none !important;
 }

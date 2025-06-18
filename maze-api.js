@@ -77,7 +77,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   }
   // Take screenshot and return as image/png (raw buffer)
   try {
-    const url = 'http://127.0.0.1:5500/'; // Adjust as needed
+    const url = 'https://mazeracebingo-1.onrender.com/'; // Updated to Render frontend URL
     const browser = await require('puppeteer').launch();
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2' });
@@ -102,7 +102,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
 
 // Real browser screenshot endpoint
 app.get('/api/current', async (req, res) => {
-  const url = 'http://127.0.0.1:5500/'; // Change this to your app's local URL/port if different
+  const url = 'https://mazeracebingo-1.onrender.com/'; // Change this to your app's local URL/port if different
   let browser;
   try {
     browser = await puppeteer.launch();
@@ -139,52 +139,48 @@ app.get('/api/maze', (req, res) => {
   });
 });
 
-// Create a new maze from a save file
-app.post('/api/create', (req, res) => {
-  const { saveFile } = req.body;
-  if (!saveFile) return res.status(400).json({ error: 'Missing saveFile path' });
-  fs.readFile(saveFile, 'utf8', async (err, data) => {
-    if (err) return res.status(500).json({ error: 'Failed to read save file' });
-    try {
-      const loaded = JSON.parse(data);
-      if (loaded && Array.isArray(loaded.mazeWalls)) {
-        mazeWalls = loaded.mazeWalls;
-        mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({
-          id: i + 1,
-          completed: false,
-        }));
-        boobytrapPositions = loaded.boobytraps || [];
-        tileDescriptions = loaded.tileDescriptions || {}; // Load tileDescriptions from the save file
-        // Take screenshot and return as image/png (raw buffer)
-        try {
-          const url = 'http://127.0.0.1:5500/'; // Adjust as needed
-          const browser = await require('puppeteer').launch();
-          const page = await browser.newPage();
-          await page.goto(url, { waitUntil: 'networkidle2' });
-          // Hide the button panel before screenshot
-          await page.evaluate(() => {
-            const panel = document.querySelector('.button-panel');
-            if (panel) panel.classList.add('hide-for-screenshot');
-          });
-          const screenshot = await page.screenshot({ fullPage: true });
-          // Restore the button panel
-          await page.evaluate(() => {
-            const panel = document.querySelector('.button-panel');
-            if (panel) panel.classList.remove('hide-for-screenshot');
-          });
-          await browser.close();
-          res.set('Content-Type', 'image/png');
-          return res.send(screenshot);
-        } catch (err) {
-          return res.status(500).json({ error: 'Screenshot failed', details: err.message });
-        }
-      } else {
-        return res.status(400).json({ error: 'Invalid save file format' });
+// Create a new maze from save file content
+app.post('/api/create', async (req, res) => {
+  const { saveData } = req.body;
+  if (!saveData) return res.status(400).json({ error: 'Missing saveData' });
+  let loaded;
+  try {
+    loaded = typeof saveData === 'string' ? JSON.parse(saveData) : saveData;
+    if (loaded && Array.isArray(loaded.mazeWalls)) {
+      mazeWalls = loaded.mazeWalls;
+      mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({
+        id: i + 1,
+        completed: false,
+      }));
+      boobytrapPositions = loaded.boobytraps || [];
+      tileDescriptions = loaded.tileDescriptions || {};
+      // Take screenshot and return as image/png (raw buffer)
+      try {
+        const url = 'https://mazeracebingo-1.onrender.com/';
+        const browser = await require('puppeteer').launch();
+        const page = await browser.newPage();
+        await page.goto(url, { waitUntil: 'networkidle2' });
+        await page.evaluate(() => {
+          const panel = document.querySelector('.button-panel');
+          if (panel) panel.classList.add('hide-for-screenshot');
+        });
+        const screenshot = await page.screenshot({ fullPage: true });
+        await page.evaluate(() => {
+          const panel = document.querySelector('.button-panel');
+          if (panel) panel.classList.remove('hide-for-screenshot');
+        });
+        await browser.close();
+        res.set('Content-Type', 'image/png');
+        return res.send(screenshot);
+      } catch (err) {
+        return res.status(500).json({ error: 'Screenshot failed', details: err.message });
       }
-    } catch (e) {
-      return res.status(400).json({ error: 'Invalid JSON in save file' });
+    } else {
+      return res.status(400).json({ error: 'Invalid save file format' });
     }
-  });
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid JSON in saveData' });
+  }
 });
 
 // Sample task list (can be made dynamic later)
@@ -252,7 +248,7 @@ app.post('/api/tiles/uncomplete/:id', async (req, res) => {
   }
   // Take screenshot and return as image/png (raw buffer)
   try {
-    const url = 'http://127.0.0.1:5500/'; // Adjust as needed
+    const url = 'https://mazeracebingo-1.onrender.com/'; // Adjust as needed
     const browser = await require('puppeteer').launch();
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2' });

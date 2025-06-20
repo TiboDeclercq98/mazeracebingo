@@ -4,7 +4,6 @@
 const express = require('express');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
-const { chromium } = require('playwright');
 const cors = require('cors');
 const app = express();
 app.use(express.json());
@@ -27,7 +26,7 @@ app.get('/api/tiles', (req, res) => {
 });
 
 // Only allow completing revealed tiles
-app.post('/api/tiles/complete/:id', async (req, res) => {
+app.post('/api/tiles/complete/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
@@ -75,57 +74,18 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
       }
     }
   }
-  // Take screenshot and return as image/png (raw buffer)
-  try {
-    const url = 'https://mazeracebingo-1.onrender.com/'; // Updated to Render frontend URL
-    const browser = await getBrowser();
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle' });
-    // Hide the button panel before screenshot
-    await page.evaluate(() => {
-      const panel = document.querySelector('.button-panel');
-      if (panel) panel.classList.add('hide-for-screenshot');
-    });
-    const screenshot = await page.screenshot({ fullPage: true });
-    // Restore the button panel
-    await page.evaluate(() => {
-      const panel = document.querySelector('.button-panel');
-      if (panel) panel.classList.remove('hide-for-screenshot');
-    });
-    await browser.close();
-    res.set('Content-Type', 'image/png');
-    res.send(screenshot);
-  } catch (err) {
-    res.status(500).json({ error: 'Screenshot failed', details: err.message });
-  }
+  res.json({ success: true, tile });
 });
 
 // Real browser screenshot endpoint
-app.get('/api/current', async (req, res) => {
-  const url = 'https://mazeracebingo-1.onrender.com/'; // Change this to your app's local URL/port if different
-  let browser;
-  try {
-    browser = await getBrowser();
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle' });
-    // Hide the button panel before screenshot
-    await page.evaluate(() => {
-      const panel = document.querySelector('.button-panel');
-      if (panel) panel.classList.add('hide-for-screenshot');
-    });
-    const screenshot = await page.screenshot({ fullPage: true });
-    // Restore the button panel
-    await page.evaluate(() => {
-      const panel = document.querySelector('.button-panel');
-      if (panel) panel.classList.remove('hide-for-screenshot');
-    });
-    res.set('Content-Type', 'image/png');
-    res.send(screenshot);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to capture screenshot', details: err.message });
-  } finally {
-    if (browser) await browser.close();
-  }
+app.get('/api/current', (req, res) => {
+  res.json({
+    size: SIZE,
+    walls: mazeWalls,
+    tiles: mazeState,
+    boobytraps: boobytrapPositions,
+    tileDescriptions
+  });
 });
 
 // New endpoint: fetch full maze state
@@ -140,7 +100,7 @@ app.get('/api/maze', (req, res) => {
 });
 
 // Create a new maze from save file content
-app.post('/api/create', async (req, res) => {
+app.post('/api/create', (req, res) => {
   const { saveData } = req.body;
   if (!saveData) return res.status(400).json({ error: 'Missing saveData' });
   let loaded;
@@ -154,27 +114,7 @@ app.post('/api/create', async (req, res) => {
       }));
       boobytrapPositions = loaded.boobytraps || [];
       tileDescriptions = loaded.tileDescriptions || {};
-      // Take screenshot and return as image/png (raw buffer)
-      try {
-        const url = 'https://mazeracebingo-1.onrender.com/';
-        const browser = await getBrowser();
-        const page = await browser.newPage();
-        await page.goto(url, { waitUntil: 'networkidle' });
-        await page.evaluate(() => {
-          const panel = document.querySelector('.button-panel');
-          if (panel) panel.classList.add('hide-for-screenshot');
-        });
-        const screenshot = await page.screenshot({ fullPage: true });
-        await page.evaluate(() => {
-          const panel = document.querySelector('.button-panel');
-          if (panel) panel.classList.remove('hide-for-screenshot');
-        });
-        await browser.close();
-        res.set('Content-Type', 'image/png');
-        return res.send(screenshot);
-      } catch (err) {
-        return res.status(500).json({ error: 'Screenshot failed', details: err.message });
-      }
+      res.json({ success: true });
     } else {
       return res.status(400).json({ error: 'Invalid save file format' });
     }
@@ -195,7 +135,7 @@ app.get('/api/tasks', (req, res) => {
 });
 
 // Uncomplete a tile if only one adjacent completed tile
-app.post('/api/tiles/uncomplete/:id', async (req, res) => {
+app.post('/api/tiles/uncomplete/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
@@ -246,35 +186,9 @@ app.post('/api/tiles/uncomplete/:id', async (req, res) => {
       }
     }
   }
-  // Take screenshot and return as image/png (raw buffer)
-  try {
-    const url = 'https://mazeracebingo-1.onrender.com/'; // Adjust as needed
-    const browser = await getBrowser();
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle' });
-    // Hide the button panel before screenshot
-    await page.evaluate(() => {
-      const panel = document.querySelector('.button-panel');
-      if (panel) panel.classList.add('hide-for-screenshot');
-    });
-    const screenshot = await page.screenshot({ fullPage: true });
-    // Restore the button panel
-    await page.evaluate(() => {
-      const panel = document.querySelector('.button-panel');
-      if (panel) panel.classList.remove('hide-for-screenshot');
-    });
-    await browser.close();
-    res.set('Content-Type', 'image/png');
-    res.send(screenshot);
-  } catch (err) {
-    res.status(500).json({ error: 'Screenshot failed', details: err.message });
-  }
+  res.json({ success: true, tile });
 });
 
 app.listen(3000, () => {
   console.log('Server running on http://localhost:3000');
 });
-
-const getBrowser = async () => {
-  return await chromium.launch({ args: ['--no-sandbox'] });
-};

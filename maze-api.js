@@ -30,27 +30,41 @@ app.post('/api/tiles/complete/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
-  // Only allow if tile is revealed (completed neighbor or is START/END)
+  // Only allow if tile is revealed (completed neighbor with no wall or is START/END)
   const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
   const endId = Math.floor(SIZE / 2) + 1;
   const isStart = id === startId;
   const isEnd = id === endId;
   if (!tile.completed && !isStart && !isEnd) {
-    // Check if any neighbor is completed
     const idx = id - 1;
     const row = Math.floor(idx / SIZE);
     const col = idx % SIZE;
-    const neighbors = [
-      { r: row - 1, c: col },
-      { r: row + 1, c: col },
-      { r: row, c: col - 1 },
-      { r: row, c: col + 1 }
+    const directions = [
+      { dr: -1, dc: 0, wall: 'top', neighborWall: 'bottom' }, // up
+      { dr: 1, dc: 0, wall: 'bottom', neighborWall: 'top' },   // down
+      { dr: 0, dc: -1, wall: 'left', neighborWall: 'right' },  // left
+      { dr: 0, dc: 1, wall: 'right', neighborWall: 'left' }    // right
     ];
-    const revealed = neighbors.some(({ r, c }) =>
-      r >= 0 && r < SIZE && c >= 0 && c < SIZE && mazeState[r * SIZE + c].completed
-    );
+    // Helper to get wall object
+    function getWallObj(r, c) {
+      return mazeWalls.find(w => w.row === r && w.col === c);
+    }
+    const revealed = directions.some(({ dr, dc, wall, neighborWall }) => {
+      const nr = row + dr;
+      const nc = col + dc;
+      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) return false;
+      const neighborIdx = nr * SIZE + nc;
+      const neighbor = mazeState[neighborIdx];
+      if (!neighbor.completed) return false;
+      const wallObj = getWallObj(row, col);
+      const neighborWallObj = getWallObj(nr, nc);
+      if ((wallObj && wallObj.walls[wall]) || (neighborWallObj && neighborWallObj.walls[neighborWall])) {
+        return false; // Wall blocks the path
+      }
+      return true;
+    });
     if (!revealed) {
-      return res.status(403).json({ error: 'Tile is not revealed' });
+      return res.status(403).json({ error: 'Tile is not revealed (blocked by wall or no adjacent completed tile)' });
     }
   }
   tile.completed = true;

@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- API-DRIVEN MAZE RENDERING ---
     async function fetchMazeState() {
-        const res = await fetch('https://mazeracebingo-1.onrender.com/api/maze');
+        const res = await fetch('https://mazeracebingo.onrender.com/api/create');
         return await res.json();
     }
 

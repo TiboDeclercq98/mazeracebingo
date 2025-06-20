@@ -4,7 +4,7 @@
 const express = require('express');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
-const puppeteer = require('puppeteer');
+const { chromium } = require('playwright');
 const cors = require('cors');
 const app = express();
 app.use(express.json());
@@ -78,9 +78,9 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   // Take screenshot and return as image/png (raw buffer)
   try {
     const url = 'https://mazeracebingo-1.onrender.com/'; // Updated to Render frontend URL
-    const browser = await require('puppeteer').launch(getPuppeteerLaunchOptions());
+    const browser = await getBrowser();
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: 'networkidle' });
     // Hide the button panel before screenshot
     await page.evaluate(() => {
       const panel = document.querySelector('.button-panel');
@@ -105,9 +105,9 @@ app.get('/api/current', async (req, res) => {
   const url = 'https://mazeracebingo-1.onrender.com/'; // Change this to your app's local URL/port if different
   let browser;
   try {
-    browser = await puppeteer.launch(getPuppeteerLaunchOptions());
+    browser = await getBrowser();
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: 'networkidle' });
     // Hide the button panel before screenshot
     await page.evaluate(() => {
       const panel = document.querySelector('.button-panel');
@@ -157,9 +157,9 @@ app.post('/api/create', async (req, res) => {
       // Take screenshot and return as image/png (raw buffer)
       try {
         const url = 'https://mazeracebingo-1.onrender.com/';
-        const browser = await require('puppeteer').launch(getPuppeteerLaunchOptions());
+        const browser = await getBrowser();
         const page = await browser.newPage();
-        await page.goto(url, { waitUntil: 'networkidle2' });
+        await page.goto(url, { waitUntil: 'networkidle' });
         await page.evaluate(() => {
           const panel = document.querySelector('.button-panel');
           if (panel) panel.classList.add('hide-for-screenshot');
@@ -249,9 +249,9 @@ app.post('/api/tiles/uncomplete/:id', async (req, res) => {
   // Take screenshot and return as image/png (raw buffer)
   try {
     const url = 'https://mazeracebingo-1.onrender.com/'; // Adjust as needed
-    const browser = await require('puppeteer').launch(getPuppeteerLaunchOptions());
+    const browser = await getBrowser();
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: 'networkidle' });
     // Hide the button panel before screenshot
     await page.evaluate(() => {
       const panel = document.querySelector('.button-panel');
@@ -275,7 +275,6 @@ app.listen(3000, () => {
   console.log('Server running on http://localhost:3000');
 });
 
-const getPuppeteerLaunchOptions = () => ({
-  args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath()
-});
+const getBrowser = async () => {
+  return await chromium.launch({ args: ['--no-sandbox'] });
+};

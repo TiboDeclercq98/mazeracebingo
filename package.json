@@ -3,9 +3,9 @@
     "canvas": "^3.1.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "puppeteer": "^24.10.1"
+    "playwright": "^1.44.0"
   },
   "scripts": {
-    "postinstall": "puppeteer install && npx puppeteer browsers install chrome"
+    "postinstall": "npx playwright install"
   }
 }

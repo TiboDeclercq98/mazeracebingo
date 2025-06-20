@@ -78,7 +78,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   // Take screenshot and return as image/png (raw buffer)
   try {
     const url = 'https://mazeracebingo-1.onrender.com/'; // Updated to Render frontend URL
-    const browser = await require('puppeteer').launch();
+    const browser = await require('puppeteer').launch(getPuppeteerLaunchOptions());
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2' });
     // Hide the button panel before screenshot
@@ -105,7 +105,7 @@ app.get('/api/current', async (req, res) => {
   const url = 'https://mazeracebingo-1.onrender.com/'; // Change this to your app's local URL/port if different
   let browser;
   try {
-    browser = await puppeteer.launch();
+    browser = await puppeteer.launch(getPuppeteerLaunchOptions());
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2' });
     // Hide the button panel before screenshot
@@ -157,7 +157,7 @@ app.post('/api/create', async (req, res) => {
       // Take screenshot and return as image/png (raw buffer)
       try {
         const url = 'https://mazeracebingo-1.onrender.com/';
-        const browser = await require('puppeteer').launch();
+        const browser = await require('puppeteer').launch(getPuppeteerLaunchOptions());
         const page = await browser.newPage();
         await page.goto(url, { waitUntil: 'networkidle2' });
         await page.evaluate(() => {
@@ -249,7 +249,7 @@ app.post('/api/tiles/uncomplete/:id', async (req, res) => {
   // Take screenshot and return as image/png (raw buffer)
   try {
     const url = 'https://mazeracebingo-1.onrender.com/'; // Adjust as needed
-    const browser = await require('puppeteer').launch();
+    const browser = await require('puppeteer').launch(getPuppeteerLaunchOptions());
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2' });
     // Hide the button panel before screenshot
@@ -273,4 +273,9 @@ app.post('/api/tiles/uncomplete/:id', async (req, res) => {
 
 app.listen(3000, () => {
   console.log('Server running on http://localhost:3000');
+});
+
+const getPuppeteerLaunchOptions = () => ({
+  args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath()
 });

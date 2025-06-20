@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- API-DRIVEN MAZE RENDERING ---
     async function fetchMazeState() {
-        const res = await fetch('http://localhost:3000/api/maze');
+        const res = await fetch('https://mazeracebingo-1.onrender.com/api/maze');
         return await res.json();
     }
 
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tile.onclick = async () => {
                 if (tile.dataset.visible === 'true' && !tile.classList.contains('clicked') && tile.textContent !== 'END') {
                     const tileId = parseInt(tile.dataset.number, 10);
-                    await fetch(`http://localhost:3000/api/tiles/complete/${tileId}`, { method: 'POST' });
+                    await fetch(`https://mazeracebingo-1.onrender.com/api/tiles/complete/${tileId}`, { method: 'POST' });
                     await renderMazeFromAPI();
                 }
             };

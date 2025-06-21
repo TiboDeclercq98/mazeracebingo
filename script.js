@@ -131,6 +131,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (wallObj.walls.bottom) tile.classList.add('wall-bottom');
                     if (wallObj.walls.left) tile.classList.add('wall-left');
                 }
+                // --- DEAD-END DETECTION ---
+                // A dead-end is a completed tile with only one accessible completed neighbor
+                let accessibleCompletedNeighbors = 0;
+                const directions = [
+                    { dr: -1, dc: 0, wall: 'top', neighborWall: 'bottom' },
+                    { dr: 1, dc: 0, wall: 'bottom', neighborWall: 'top' },
+                    { dr: 0, dc: -1, wall: 'left', neighborWall: 'right' },
+                    { dr: 0, dc: 1, wall: 'right', neighborWall: 'left' }
+                ];
+                function getWallObj(r, c) {
+                    return state.walls.find(w => w.row === r && w.col === c);
+                }
+                directions.forEach(({ dr, dc, wall, neighborWall }) => {
+                    const nr = row + dr;
+                    const nc = col + dc;
+                    if (nr < 0 || nr >= state.size || nc < 0 || nc >= state.size) return;
+                    const nIdx = nr * state.size + nc;
+                    const neighbor = state.tiles[nIdx];
+                    if (!neighbor.completed) return;
+                    const wallObj = getWallObj(row, col);
+                    const neighborWallObj = getWallObj(nr, nc);
+                    if ((wallObj && wallObj.walls[wall]) || (neighborWallObj && neighborWallObj.walls[neighborWall])) return;
+                    accessibleCompletedNeighbors++;
+                });
+                if (accessibleCompletedNeighbors === 1) {
+                    tile.classList.add('deadend');
+                }
+                // --- END DEAD-END DETECTION ---
             } else if (revealed.has(i)) {
                 tile.textContent = tileData.id;
                 tile.classList.add('revealed');

@@ -153,8 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tile.dataset.visible = 'false';
                 tile.classList.remove('wall-top', 'wall-right', 'wall-bottom', 'wall-left');
             }
-            // Boobytrap: only show if revealed or completed
-            if (state.boobytraps && state.boobytraps.some(b => b.row === row && b.col === col) && (tileData.completed || revealed.has(i))) {
+            // Boobytrap: only show if completed
+            if (state.boobytraps && state.boobytraps.some(b => b.row === row && b.col === col) && tileData.completed) {
                 tile.classList.add('boobytrap');
             } else {
                 tile.classList.remove('boobytrap');

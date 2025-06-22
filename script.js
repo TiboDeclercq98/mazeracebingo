@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tile.dataset.visible = 'true';
                 // Always remove wall classes first
                 tile.classList.remove('wall-top', 'wall-right', 'wall-bottom', 'wall-left');
+                tile.classList.remove('deadend'); // Remove before re-adding if needed
                 // Add wall classes for completed tiles only
                 const wallObj = state.walls.find(w => w.row === row && w.col === col);
                 if (wallObj) {
@@ -157,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         accessibleCompletedNeighbors++;
                     });
                     if (accessibleCompletedNeighbors === 1) {
-                        tile.classList.add('deadend');
+                        tile.classList.add('deadend'); // Add after .clicked
                     }
                 }
                 // --- END DEAD-END DETECTION ---

@@ -1,10 +1,11 @@
 // Express API for Maze Bingo
-// npm install express canvas puppeteer cors
+// npm install express canvas puppeteer cors sqlite3
 
 const express = require('express');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 const cors = require('cors');
+const sqlite3 = require('sqlite3').verbose();
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -19,6 +20,70 @@ let mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({
 let mazeWalls = [];
 let boobytrapPositions = [];
 let tileDescriptions = {}; // New state for tile descriptions
+
+// Database setup
+const DB_PATH = 'maze.db';
+const db = new sqlite3.Database(DB_PATH);
+
+// Initialize DB tables if not exist
+function initDb() {
+  db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS tiles (id INTEGER PRIMARY KEY, completed INTEGER)`);
+    db.run(`CREATE TABLE IF NOT EXISTS walls (row INTEGER, col INTEGER, walls TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS boobytraps (row INTEGER, col INTEGER)`);
+    db.run(`CREATE TABLE IF NOT EXISTS tileDescriptions (tileId INTEGER PRIMARY KEY, description TEXT)`);
+  });
+}
+initDb();
+
+// Load maze state from DB
+function loadMazeFromDb(callback) {
+  db.serialize(() => {
+    db.all('SELECT * FROM tiles', (err, tiles) => {
+      if (!err && tiles.length === SIZE * SIZE) {
+        mazeState = tiles.map(t => ({ id: t.id, completed: !!t.completed }));
+      }
+      db.all('SELECT * FROM walls', (err, rows) => {
+        mazeWalls = rows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
+        db.all('SELECT * FROM boobytraps', (err, traps) => {
+          boobytrapPositions = traps.map(t => ({ row: t.row, col: t.col }));
+          db.all('SELECT * FROM tileDescriptions', (err, descs) => {
+            tileDescriptions = {};
+            descs.forEach(d => { tileDescriptions[d.tileId] = d.description; });
+            if (callback) callback();
+          });
+        });
+      });
+    });
+  });
+}
+
+// Save maze state to DB
+function saveMazeToDb() {
+  db.serialize(() => {
+    db.run('DELETE FROM tiles');
+    const tileStmt = db.prepare('INSERT INTO tiles (id, completed) VALUES (?, ?)');
+    mazeState.forEach(t => tileStmt.run(t.id, t.completed ? 1 : 0));
+    tileStmt.finalize();
+    db.run('DELETE FROM walls');
+    const wallStmt = db.prepare('INSERT INTO walls (row, col, walls) VALUES (?, ?, ?)');
+    mazeWalls.forEach(w => wallStmt.run(w.row, w.col, JSON.stringify(w.walls)));
+    wallStmt.finalize();
+    db.run('DELETE FROM boobytraps');
+    const trapStmt = db.prepare('INSERT INTO boobytraps (row, col) VALUES (?, ?)');
+    boobytrapPositions.forEach(b => trapStmt.run(b.row, b.col));
+    trapStmt.finalize();
+    db.run('DELETE FROM tileDescriptions');
+    const descStmt = db.prepare('INSERT INTO tileDescriptions (tileId, description) VALUES (?, ?)');
+    Object.entries(tileDescriptions).forEach(([id, desc]) => descStmt.run(id, desc));
+    descStmt.finalize();
+  });
+}
+
+// Load maze from DB on server start
+loadMazeFromDb(() => {
+  console.log('Maze state loaded from database');
+});
 
 // Fetch all tiles
 app.get('/api/tiles', (req, res) => {
@@ -68,6 +133,7 @@ app.post('/api/tiles/complete/:id', (req, res) => {
     }
   }
   tile.completed = true;
+  saveMazeToDb();
   // Reveal neighbors (set their completed=false if not already present)
   const idx = id - 1;
   const row = Math.floor(idx / SIZE);
@@ -128,6 +194,7 @@ app.post('/api/create', (req, res) => {
       }));
       boobytrapPositions = loaded.boobytraps || [];
       tileDescriptions = loaded.tileDescriptions || {};
+      saveMazeToDb();
       res.json({ success: true });
     } else {
       return res.status(400).json({ error: 'Invalid save file format' });
@@ -176,6 +243,7 @@ app.post('/api/tiles/uncomplete/:id', (req, res) => {
   }
   // Uncomplete the tile
   tile.completed = false;
+  saveMazeToDb();
   // Unreveal relevant tiles: unreveal any neighbor that is not adjacent to any other completed tile
   for (const { r, c } of neighbors) {
     if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {

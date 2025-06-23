@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Right
             if (col < state.size - 1) {
-                const nIdx = row * state.size + (col + 1);
+                const nIdx = row * size + (col + 1);
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.right) &&
@@ -149,16 +149,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 tile.textContent = tileData.id;
                 tile.classList.add('revealed');
                 tile.dataset.visible = 'true';
-                // Visual: darker blue for higher completionsRequired
-                if (completionsRequired > 1 && !tileData.completed) {
-                    // Base blue: #2196f3 (33, 150, 243)
-                    // For each extra required completion, darken by 20 per channel (min 0)
-                    const darken = Math.min((completionsRequired - (tileData.completionsDone || 0) - 1) * 20, 120);
-                    const r = Math.max(33 - darken, 0);
-                    const g = Math.max(150 - darken, 0);
-                    const b = Math.max(243 - darken, 60); // don't go too dark
-                    tile.style.background = `rgb(${r},${g},${b})`;
-                    tile.style.color = '#fff';
+                // Visual: darker blue for higher completions still needed
+                if (!tileData.completed && completionsRequired > 1) {
+                    // completionsLeft = completionsRequired - completionsDone
+                    const completionsLeft = completionsRequired - (tileData.completionsDone || 0);
+                    if (completionsLeft > 1) {
+                        const darken = Math.min((completionsLeft - 1) * 20, 120);
+                        const r = Math.max(33 - darken, 0);
+                        const g = Math.max(150 - darken, 0);
+                        const b = Math.max(243 - darken, 60); // don't go too dark
+                        tile.style.background = `rgb(${r},${g},${b})`;
+                        tile.style.color = '#fff';
+                    } else {
+                        tile.style.background = '';
+                        tile.style.color = '';
+                    }
                 } else {
                     tile.style.background = '';
                     tile.style.color = '';

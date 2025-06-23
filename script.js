@@ -188,7 +188,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const tileDescs = state.tileDescriptions || {};
             // Only show revealed tiles that are NOT completed (and not START/END)
             const revealedTiles = Array.from(revealed)
-                .filter(idx => idx !== startIdx && idx !== endIdx && !state.tiles[idx].completed)
+                .filter(idx => {
+                    if (idx === startIdx || idx === endIdx) return false;
+                    const tileData = state.tiles[idx];
+                    return tileData && !tileData.completed;
+                })
                 .sort((a, b) => a - b);
             overviewPanel.innerHTML = '<b>Revealed Tiles:</b><ul style="padding-left:18px">' +
                 revealedTiles.map(idx => {

@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nc = col + dc;
                 if (nr < 0 || nr >= state.size || nc < 0 || nc >= state.size) continue;
                 const neighborIdx = nr * state.size + nc;
-                if (neighborIdx === startIdx || neighborIdx === endIdx) continue;
+                // DO NOT skip START/END for adjacency checks
                 const neighbor = state.tiles[neighborIdx];
                 if (!neighbor.completed) continue;
                 // Check for walls

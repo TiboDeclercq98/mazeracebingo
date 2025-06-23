@@ -42,18 +42,26 @@ function loadMazeFromDb(callback) {
     db.all('SELECT * FROM tiles', (err, tiles) => {
       if (!err && tiles.length === SIZE * SIZE) {
         mazeState = tiles.map(t => ({ id: t.id, completed: !!t.completed }));
-      }
-      db.all('SELECT * FROM walls', (err, rows) => {
-        mazeWalls = rows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
-        db.all('SELECT * FROM boobytraps', (err, traps) => {
-          boobytrapPositions = traps.map(t => ({ row: t.row, col: t.col }));
-          db.all('SELECT * FROM tileDescriptions', (err, descs) => {
-            tileDescriptions = {};
-            descs.forEach(d => { tileDescriptions[d.tileId] = d.description; });
-            if (callback) callback();
+        db.all('SELECT * FROM walls', (err, rows) => {
+          mazeWalls = rows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
+          db.all('SELECT * FROM boobytraps', (err, traps) => {
+            boobytrapPositions = traps.map(t => ({ row: t.row, col: t.col }));
+            db.all('SELECT * FROM tileDescriptions', (err, descs) => {
+              tileDescriptions = {};
+              descs.forEach(d => { tileDescriptions[d.tileId] = d.description; });
+              if (callback) callback();
+            });
           });
         });
-      });
+      } else {
+        // DB is empty or corrupt, initialize default maze and save
+        mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({ id: i + 1, completed: false }));
+        mazeWalls = [];
+        boobytrapPositions = [];
+        tileDescriptions = {};
+        saveMazeToDb();
+        if (callback) callback();
+      }
     });
   });
 }

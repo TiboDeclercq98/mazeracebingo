@@ -186,7 +186,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const overviewPanel = document.getElementById('overview-panel');
         if (overviewPanel) {
             const tileDescs = state.tileDescriptions || {};
-            const revealedTiles = Array.from(revealed).filter(idx => idx !== startIdx && idx !== endIdx).sort((a, b) => a - b);
+            // Only show revealed tiles that are NOT completed (and not START/END)
+            const revealedTiles = Array.from(revealed)
+                .filter(idx => idx !== startIdx && idx !== endIdx && !state.tiles[idx].completed)
+                .sort((a, b) => a - b);
             overviewPanel.innerHTML = '<b>Revealed Tiles:</b><ul style="padding-left:18px">' +
                 revealedTiles.map(idx => {
                     const t = state.tiles[idx];

@@ -26,10 +26,18 @@ let tileDescriptions = {}; // New state for tile descriptions
 const DB_PATH = 'maze.db';
 const db = new sqlite3.Database(DB_PATH);
 
+// --- DB MIGRATION: Add completionsRequired and completionsDone columns if not exist ---
+db.serialize(() => {
+  db.get("PRAGMA table_info(tiles)", (err, info) => {
+    db.run(`ALTER TABLE tiles ADD COLUMN completionsRequired INTEGER DEFAULT 1`, () => {});
+    db.run(`ALTER TABLE tiles ADD COLUMN completionsDone INTEGER DEFAULT 0`, () => {});
+  });
+});
+
 // Initialize DB tables if not exist
 function initDb() {
   db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS tiles (id INTEGER PRIMARY KEY, completed INTEGER)`);
+    db.run(`CREATE TABLE IF NOT EXISTS tiles (id INTEGER PRIMARY KEY, completed INTEGER, completionsRequired INTEGER DEFAULT 1, completionsDone INTEGER DEFAULT 0)`);
     db.run(`CREATE TABLE IF NOT EXISTS walls (row INTEGER, col INTEGER, walls TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS boobytraps (row INTEGER, col INTEGER)`);
     db.run(`CREATE TABLE IF NOT EXISTS tileDescriptions (tileId INTEGER PRIMARY KEY, description TEXT)`);
@@ -42,7 +50,12 @@ function loadMazeFromDb(callback) {
   db.serialize(() => {
     db.all('SELECT * FROM tiles', (err, tiles) => {
       if (!err && tiles.length === SIZE * SIZE) {
-        mazeState = tiles.map(t => ({ id: t.id, completed: !!t.completed }));
+        mazeState = tiles.map(t => ({
+          id: t.id,
+          completed: !!t.completed,
+          completionsRequired: t.completionsRequired !== undefined ? t.completionsRequired : 1,
+          completionsDone: t.completionsDone !== undefined ? t.completionsDone : 0
+        }));
         db.all('SELECT * FROM walls', (err, rows) => {
           mazeWalls = rows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
           db.all('SELECT * FROM boobytraps', (err, traps) => {
@@ -56,7 +69,7 @@ function loadMazeFromDb(callback) {
         });
       } else {
         // DB is empty or corrupt, initialize default maze and save
-        mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({ id: i + 1, completed: false }));
+        mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({ id: i + 1, completed: false, completionsRequired: 1, completionsDone: 0 }));
         mazeWalls = [];
         boobytrapPositions = [];
         tileDescriptions = {};
@@ -71,8 +84,8 @@ function loadMazeFromDb(callback) {
 function saveMazeToDb() {
   db.serialize(() => {
     db.run('DELETE FROM tiles');
-    const tileStmt = db.prepare('INSERT INTO tiles (id, completed) VALUES (?, ?)');
-    mazeState.forEach(t => tileStmt.run(t.id, t.completed ? 1 : 0));
+    const tileStmt = db.prepare('INSERT INTO tiles (id, completed, completionsRequired, completionsDone) VALUES (?, ?, ?, ?)');
+    mazeState.forEach(t => tileStmt.run(t.id, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0));
     tileStmt.finalize();
     db.run('DELETE FROM walls');
     const wallStmt = db.prepare('INSERT INTO walls (row, col, walls) VALUES (?, ?, ?)');
@@ -141,7 +154,71 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
       return res.status(403).json({ error: 'Tile is not revealed (blocked by wall or no adjacent completed tile)' });
     }
   }
-  tile.completed = true;
+  // --- COMPLETION LOGIC ---
+  if (!tile.completed) {
+    tile.completionsDone = (tile.completionsDone || 0) + 1;
+    if (tile.completionsDone >= (tile.completionsRequired || 1)) {
+      tile.completed = true;
+      // --- BOOBYTRAP LOGIC: If this tile is a boobytrap, add a required completion to a random revealed, uncompleted tile ---
+      const idx = id - 1;
+      const row = Math.floor(idx / SIZE);
+      const col = idx % SIZE;
+      const isBoobytrap = boobytrapPositions.some(b => b.row === row && b.col === col);
+      if (isBoobytrap) {
+        // Find all revealed, uncompleted, non-START/END tiles
+        const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
+        const endId = Math.floor(SIZE / 2) + 1;
+        // Helper to get wall object
+        function getWallObj(r, c) {
+          return mazeWalls.find(w => w.row === r && w.col === c);
+        }
+        // Find revealed tiles
+        const revealed = new Set();
+        mazeState.forEach((t, i) => {
+          if (t.completed) {
+            revealed.add(i);
+            const row = Math.floor(i / SIZE);
+            const col = i % SIZE;
+            const wallObj = getWallObj(row, col);
+            // Up
+            if (row > 0) {
+              const nIdx = (row - 1) * SIZE + col;
+              const nWallObj = getWallObj(row - 1, col);
+              if ((!wallObj || !wallObj.walls.top) && (!nWallObj || !nWallObj.walls.bottom)) revealed.add(nIdx);
+            }
+            // Down
+            if (row < SIZE - 1) {
+              const nIdx = (row + 1) * SIZE + col;
+              const nWallObj = getWallObj(row + 1, col);
+              if ((!wallObj || !wallObj.walls.bottom) && (!nWallObj || !nWallObj.walls.top)) revealed.add(nIdx);
+            }
+            // Left
+            if (col > 0) {
+              const nIdx = row * SIZE + (col - 1);
+              const nWallObj = getWallObj(row, col - 1);
+              if ((!wallObj || !wallObj.walls.left) && (!nWallObj || !nWallObj.walls.right)) revealed.add(nIdx);
+            }
+            // Right
+            if (col < SIZE - 1) {
+              const nIdx = row * SIZE + (col + 1);
+              const nWallObj = getWallObj(row, col + 1);
+              if ((!wallObj || !wallObj.walls.right) && (!nWallObj || !nWallObj.walls.left)) revealed.add(nIdx);
+            }
+          }
+        });
+        // Filter to only uncompleted, non-START/END
+        const candidates = Array.from(revealed).filter(i => {
+          const t = mazeState[i];
+          return !t.completed && t.id !== startId && t.id !== endId;
+        });
+        if (candidates.length > 0) {
+          const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
+          mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
+        }
+      }
+      // --- END BOOBYTRAP LOGIC ---
+    }
+  }
   saveMazeToDb();
   // Reveal neighbors (set their completed=false if not already present)
   const idx = id - 1;
@@ -270,8 +347,11 @@ app.post('/api/tiles/uncomplete/:id', (req, res) => {
   if (completedCount !== 1) {
     return res.status(400).json({ error: 'Tile cannot be uncompleted (must have exactly 1 adjacent completed tile)' });
   }
-  // Uncomplete the tile
-  tile.completed = false;
+  // --- UNCOMPLETE LOGIC ---
+  if (tile.completionsDone > 0) tile.completionsDone--;
+  if (tile.completionsDone < (tile.completionsRequired || 1)) {
+    tile.completed = false;
+  }
   saveMazeToDb();
   // Unreveal relevant tiles: unreveal any neighbor that is not adjacent to any other completed tile
   for (const { r, c } of neighbors) {

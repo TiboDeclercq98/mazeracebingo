@@ -97,6 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
             tile.className = 'tile';
             tile.dataset.number = tileData.id;
             tile.dataset.index = i;
+            // --- COMPLETIONS REQUIRED ---
+            // Default to 1 if not present
+            const completionsRequired = tileData.completionsRequired !== undefined ? tileData.completionsRequired : 1;
+            const completionsLeft = completionsRequired - (tileData.completionsDone || 0);
             // START/END
             if (i === startIdx) {
                 tile.textContent = 'START';
@@ -145,6 +149,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 tile.textContent = tileData.id;
                 tile.classList.add('revealed');
                 tile.dataset.visible = 'true';
+                // Visual: darker blue for higher completionsRequired
+                if (completionsRequired > 1) {
+                    // Base blue: #2196f3 (33, 150, 243)
+                    // For each extra required completion, darken by 20 per channel (min 0)
+                    const darken = Math.min((completionsRequired - 1) * 20, 120);
+                    const r = Math.max(33 - darken, 0);
+                    const g = Math.max(150 - darken, 0);
+                    const b = Math.max(243 - darken, 60); // don't go too dark
+                    tile.style.background = `rgb(${r},${g},${b})`;
+                    tile.style.color = '#fff';
+                } else {
+                    tile.style.background = '';
+                    tile.style.color = '';
+                }
                 // Remove wall classes for revealed but not completed
                 tile.classList.remove('wall-top', 'wall-right', 'wall-bottom', 'wall-left');
             } else {

@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Reveal adjacent to completed, only if no wall between
         completed.forEach(idx => {
-            // Do not add completed tile itself to revealed set for overview
+            revealed.add(idx);
             const row = Math.floor(idx / state.size);
             const col = idx % state.size;
             const wallObj = getWallObj(idx);
@@ -50,8 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.top) &&
-                    (!nWallObj || !nWallObj.walls.bottom) &&
-                    !state.tiles[nIdx].completed
+                    (!nWallObj || !nWallObj.walls.bottom)
                 ) {
                     revealed.add(nIdx);
                 }
@@ -62,8 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.bottom) &&
-                    (!nWallObj || !nWallObj.walls.top) &&
-                    !state.tiles[nIdx].completed
+                    (!nWallObj || !nWallObj.walls.top)
                 ) {
                     revealed.add(nIdx);
                 }
@@ -74,8 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.left) &&
-                    (!nWallObj || !nWallObj.walls.right) &&
-                    !state.tiles[nIdx].completed
+                    (!nWallObj || !nWallObj.walls.right)
                 ) {
                     revealed.add(nIdx);
                 }
@@ -86,8 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.right) &&
-                    (!nWallObj || !nWallObj.walls.left) &&
-                    !state.tiles[nIdx].completed
+                    (!nWallObj || !nWallObj.walls.left)
                 ) {
                     revealed.add(nIdx);
                 }
@@ -193,30 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (idx === startIdx || idx === endIdx) continue;
             const tile = state.tiles[idx];
             if (tile.completed) continue;
-            // A tile is revealed if it is adjacent to a completed tile and not blocked by a wall
-            const row = Math.floor(idx / state.size);
-            const col = idx % state.size;
-            const directions = [
-                { dr: -1, dc: 0, wall: 'top', neighborWall: 'bottom' },
-                { dr: 1, dc: 0, wall: 'bottom', neighborWall: 'top' },
-                { dr: 0, dc: -1, wall: 'left', neighborWall: 'right' },
-                { dr: 0, dc: 1, wall: 'right', neighborWall: 'left' }
-            ];
-            for (const { dr, dc, wall, neighborWall } of directions) {
-                const nr = row + dr;
-                const nc = col + dc;
-                if (nr < 0 || nr >= state.size || nc < 0 || nc >= state.size) continue;
-                const neighborIdx = nr * state.size + nc;
-                // DO NOT skip START/END for adjacency checks
-                const neighbor = state.tiles[neighborIdx];
-                if (!neighbor.completed) continue;
-                // Check for walls
-                const wallObj = state.walls.find(w => w.row === row && w.col === col);
-                const neighborWallObj = state.walls.find(w => w.row === nr && w.col === nc);
-                if ((wallObj && wallObj.walls[wall]) || (neighborWallObj && neighborWallObj.walls[neighborWall])) continue;
-                revealedUncompleted.add(idx);
-                break;
-            }
+            if (revealed.has(idx)) revealedUncompleted.add(idx);
         }
         // Render overview panel
         const overviewPanel = document.getElementById('overview-panel');

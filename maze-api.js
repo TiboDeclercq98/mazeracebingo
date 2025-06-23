@@ -240,6 +240,72 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
         }
       }
       // --- END BOOBYTRAP LOGIC ---
+      // --- DEAD-END LOGIC: If this tile is a dead-end, lower a random revealed tile's completionsRequired by 1 ---
+      // Dead-end: completed, not START/END, surrounded by 3 walls
+      const deadendIdx = id - 1;
+      const deadendRow = Math.floor(deadendIdx / SIZE);
+      const deadendCol = deadendIdx % SIZE;
+      const wallObj = mazeWalls.find(w => w.row === deadendRow && w.col === deadendCol);
+      const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
+      const endId = Math.floor(SIZE / 2) + 1;
+      if (wallObj && id !== startId && id !== endId) {
+        const wallCount = ['top', 'right', 'bottom', 'left'].reduce((count, dir) => count + (wallObj.walls[dir] ? 1 : 0), 0);
+        if (wallCount === 3) {
+          // Find all revealed, uncompleted, non-START/END tiles with completionsRequired > 0
+          function getWallObj2(r, c) {
+            return mazeWalls.find(w => w.row === r && w.col === c);
+          }
+          const revealed = new Set();
+          mazeState.forEach((t, i) => {
+            if (t.completed) {
+              revealed.add(i);
+              const row2 = Math.floor(i / SIZE);
+              const col2 = i % SIZE;
+              const wallObj2 = getWallObj2(row2, col2);
+              // Up
+              if (row2 > 0) {
+                const nIdx = (row2 - 1) * SIZE + col2;
+                const nWallObj = getWallObj2(row2 - 1, col2);
+                if ((!wallObj2 || !wallObj2.walls.top) && (!nWallObj || !nWallObj.walls.bottom)) revealed.add(nIdx);
+              }
+              // Down
+              if (row2 < SIZE - 1) {
+                const nIdx = (row2 + 1) * SIZE + col2;
+                const nWallObj = getWallObj2(row2 + 1, col2);
+                if ((!wallObj2 || !wallObj2.walls.bottom) && (!nWallObj || !nWallObj.walls.top)) revealed.add(nIdx);
+              }
+              // Left
+              if (col2 > 0) {
+                const nIdx = row2 * SIZE + (col2 - 1);
+                const nWallObj = getWallObj2(row2, col2 - 1);
+                if ((!wallObj2 || !wallObj2.walls.left) && (!nWallObj || !nWallObj.walls.right)) revealed.add(nIdx);
+              }
+              // Right
+              if (col2 < SIZE - 1) {
+                const nIdx = row2 * SIZE + (col2 + 1);
+                const nWallObj = getWallObj2(row2, col2 + 1);
+                if ((!wallObj2 || !wallObj2.walls.right) && (!nWallObj || !nWallObj.walls.left)) revealed.add(nIdx);
+              }
+            }
+          });
+          // Filter to only uncompleted, non-START/END, completionsRequired > 0
+          const candidates = Array.from(revealed).filter(i => {
+            const t = mazeState[i];
+            return !t.completed && t.id !== startId && t.id !== endId && (t.completionsRequired || 1) > 0;
+          });
+          if (candidates.length > 0) {
+            const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
+            mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) - 1;
+            // If completionsRequired drops to 0, mark as completed
+            if (mazeState[pickIdx].completionsRequired <= 0) {
+              mazeState[pickIdx].completionsRequired = 0;
+              mazeState[pickIdx].completed = true;
+              mazeState[pickIdx].completionsDone = 0;
+            }
+          }
+        }
+      }
+      // --- END DEAD-END LOGIC ---
     }
   }
   saveMazeToDb();

@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Left
             if (col > 0) {
-                const nIdx = row * state.size + (col - 1);
+                const nIdx = row * size + (col - 1);
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.left) &&
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Right
             if (col < state.size - 1) {
-                const nIdx = row * state.size + (col + 1);
+                const nIdx = row * size + (col + 1);
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.right) &&
@@ -191,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 .filter(idx => {
                     if (idx === startIdx || idx === endIdx) return false;
                     const tileData = state.tiles[idx];
-                    return tileData && !tileData.completed;
+                    // Explicitly check for completed === false
+                    return tileData && tileData.completed === false;
                 })
                 .sort((a, b) => a - b);
             overviewPanel.innerHTML = '<b>Revealed Tiles:</b><ul style="padding-left:18px">' +

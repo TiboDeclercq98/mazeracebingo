@@ -214,6 +214,12 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
         if (candidates.length > 0) {
           const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
           mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
+          // Respond with boobytrap message for Discord bot
+          return res.json({
+            boobytrap: true,
+            message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion`,
+            tile: mazeState[pickIdx]
+          });
         }
       }
       // --- END BOOBYTRAP LOGIC ---

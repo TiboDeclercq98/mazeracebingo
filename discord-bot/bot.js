@@ -45,6 +45,7 @@ client.on('interactionCreate', async interaction => {
   if (interaction.commandName === 'completetile') {
     const id = interaction.options.getInteger('id');
     try {
+      await interaction.deferReply(); // Acknowledge immediately to avoid timeout
       const res = await fetch(`${API_BASE}/tiles/complete/${id}`, { method: 'POST' });
       if (!res.ok) {
         // Try to parse error message from JSON
@@ -56,32 +57,34 @@ client.on('interactionCreate', async interaction => {
         throw new Error(errMsg);
       }
       const buffer = Buffer.from(await res.arrayBuffer());
-      await interaction.reply({
+      await interaction.editReply({
         content: `Tile ${id} completed! Here is the updated maze:`,
         files: [{ attachment: buffer, name: `maze-tile-${id}.png` }]
       });
     } catch (e) {
-      await interaction.reply({ content: `Error: ${e.message}`, ephemeral: true });
+      await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
     }
   }
 
   if (interaction.commandName === 'createmaze') {
     try {
+      await interaction.deferReply();
       const res = await fetch(`${API_BASE}/create`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to create maze');
-      await interaction.reply('New maze created!');
+      await interaction.editReply('New maze created!');
     } catch (e) {
-      await interaction.reply({ content: `Error: ${e.message}`, ephemeral: true });
+      await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
     }
   }
 
   if (interaction.commandName === 'fetchmaze') {
     try {
+      await interaction.deferReply();
       const res = await fetch(`${API_BASE}/tiles`);
       const data = await res.json();
-      await interaction.reply('Current maze state: ' + JSON.stringify(data));
+      await interaction.editReply('Current maze state: ' + JSON.stringify(data));
     } catch (e) {
-      await interaction.reply({ content: `Error: ${e.message}`, ephemeral: true });
+      await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
     }
   }
 });

@@ -186,19 +186,43 @@ document.addEventListener('DOMContentLoaded', () => {
             grid.appendChild(tile);
         }
 
-        // Render overview of revealed tiles (excluding START/END, show description)
+        // --- REWORKED OVERVIEW PANEL LOGIC ---
+        // Find all revealed but uncompleted tiles (excluding START/END)
+        const revealedUncompleted = new Set();
+        for (let idx = 0; idx < state.tiles.length; idx++) {
+            if (idx === startIdx || idx === endIdx) continue;
+            const tile = state.tiles[idx];
+            if (tile.completed) continue;
+            // A tile is revealed if it is adjacent to a completed tile and not blocked by a wall
+            const row = Math.floor(idx / state.size);
+            const col = idx % state.size;
+            const directions = [
+                { dr: -1, dc: 0, wall: 'top', neighborWall: 'bottom' },
+                { dr: 1, dc: 0, wall: 'bottom', neighborWall: 'top' },
+                { dr: 0, dc: -1, wall: 'left', neighborWall: 'right' },
+                { dr: 0, dc: 1, wall: 'right', neighborWall: 'left' }
+            ];
+            for (const { dr, dc, wall, neighborWall } of directions) {
+                const nr = row + dr;
+                const nc = col + dc;
+                if (nr < 0 || nr >= state.size || nc < 0 || nc >= state.size) continue;
+                const neighborIdx = nr * state.size + nc;
+                if (neighborIdx === startIdx || neighborIdx === endIdx) continue;
+                const neighbor = state.tiles[neighborIdx];
+                if (!neighbor.completed) continue;
+                // Check for walls
+                const wallObj = state.walls.find(w => w.row === row && w.col === col);
+                const neighborWallObj = state.walls.find(w => w.row === nr && w.col === nc);
+                if ((wallObj && wallObj.walls[wall]) || (neighborWallObj && neighborWallObj.walls[neighborWall])) continue;
+                revealedUncompleted.add(idx);
+                break;
+            }
+        }
+        // Render overview panel
         const overviewPanel = document.getElementById('overview-panel');
         if (overviewPanel) {
             const tileDescs = state.tileDescriptions || {};
-            // Only show revealed tiles that are NOT completed (and not START/END)
-            const revealedTiles = Array.from(revealed)
-                .filter(idx => {
-                    if (idx === startIdx || idx === endIdx) return false;
-                    const tileData = state.tiles[idx];
-                    // Explicitly check for completed === false
-                    return tileData && tileData.completed === false;
-                })
-                .sort((a, b) => a - b);
+            const revealedTiles = Array.from(revealedUncompleted).sort((a, b) => a - b);
             overviewPanel.innerHTML = '<b>Revealed Tiles:</b><ul style="padding-left:18px">' +
                 revealedTiles.map(idx => {
                     const t = state.tiles[idx];

@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Reveal adjacent to completed, only if no wall between
         completed.forEach(idx => {
-            revealed.add(idx);
+            // Do not add completed tile itself to revealed set for overview
             const row = Math.floor(idx / state.size);
             const col = idx % state.size;
             const wallObj = getWallObj(idx);
@@ -50,7 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.top) &&
-                    (!nWallObj || !nWallObj.walls.bottom)
+                    (!nWallObj || !nWallObj.walls.bottom) &&
+                    !state.tiles[nIdx].completed
                 ) {
                     revealed.add(nIdx);
                 }
@@ -61,7 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.bottom) &&
-                    (!nWallObj || !nWallObj.walls.top)
+                    (!nWallObj || !nWallObj.walls.top) &&
+                    !state.tiles[nIdx].completed
                 ) {
                     revealed.add(nIdx);
                 }
@@ -72,7 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.left) &&
-                    (!nWallObj || !nWallObj.walls.right)
+                    (!nWallObj || !nWallObj.walls.right) &&
+                    !state.tiles[nIdx].completed
                 ) {
                     revealed.add(nIdx);
                 }
@@ -83,7 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.right) &&
-                    (!nWallObj || !nWallObj.walls.left)
+                    (!nWallObj || !nWallObj.walls.left) &&
+                    !state.tiles[nIdx].completed
                 ) {
                     revealed.add(nIdx);
                 }

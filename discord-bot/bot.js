@@ -57,18 +57,21 @@ client.on('interactionCreate', async interaction => {
         throw new Error(errMsg);
       }
       const buffer = Buffer.from(await res.arrayBuffer());
-      // Check for boobytrap message header (case-insensitive, log all headers for debug)
-      let boobytrapMsg = res.headers.get('x-boobytrap-message');
-      if (!boobytrapMsg) {
-        // Try alternate casing (node-fetch sometimes lowercases headers)
-        boobytrapMsg = res.headers.get('X-Boobytrap-Message') || res.headers.get('X-BOOBYTRAP-MESSAGE');
+      // Check for boobytrap or chest message header (case-insensitive, log all headers for debug)
+      let specialMsg = res.headers.get('x-boobytrap-message');
+      if (!specialMsg) {
+        specialMsg = res.headers.get('x-chest-message');
       }
-      if (!boobytrapMsg) {
+      if (!specialMsg) {
+        // Try alternate casing (node-fetch sometimes lowercases headers)
+        specialMsg = res.headers.get('X-Boobytrap-Message') || res.headers.get('X-BOOBYTRAP-MESSAGE') || res.headers.get('X-Chest-Message') || res.headers.get('X-CHEST-MESSAGE');
+      }
+      if (!specialMsg) {
         // Debug: log all headers to help diagnose
         console.log('Headers received:', Object.fromEntries(res.headers.entries()));
       }
       await interaction.editReply({
-        content: boobytrapMsg ? boobytrapMsg : `Tile ${id} completed! Here is the updated maze:`,
+        content: specialMsg ? specialMsg : `Tile ${id} completed! Here is the updated maze:`,
         files: [{ attachment: buffer, name: `maze-tile-${id}.png` }]
       });
     } catch (e) {

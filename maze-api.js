@@ -301,6 +301,30 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
               mazeState[pickIdx].completionsRequired = 0;
               mazeState[pickIdx].completed = true;
               mazeState[pickIdx].completionsDone = 0;
+              saveMazeToDb();
+              // Take screenshot and send chest message header
+              try {
+                const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
+                const browser = await chromium.launch({ args: ['--no-sandbox'] });
+                const page = await browser.newPage();
+                await page.goto(url, { waitUntil: 'networkidle' });
+                await page.evaluate(() => {
+                  const panel = document.querySelector('.button-panel');
+                  if (panel) panel.classList.add('hide-for-screenshot');
+                });
+                const screenshot = await page.screenshot({ fullPage: true });
+                await page.evaluate(() => {
+                  const panel = document.querySelector('.button-panel');
+                  if (panel) panel.classList.remove('hide-for-screenshot');
+                });
+                await browser.close();
+                res.set('Content-Type', 'image/png');
+                res.set('X-Chest-Message', `You found a chest, tile ${mazeState[pickIdx].id} has been completed`);
+                return res.send(screenshot);
+              } catch (err) {
+                res.set('X-Chest-Message', `You found a chest, tile ${mazeState[pickIdx].id} has been completed (screenshot failed)`);
+                return res.status(500).end();
+              }
             }
           }
         }

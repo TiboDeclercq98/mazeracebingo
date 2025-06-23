@@ -6,6 +6,7 @@ const { createCanvas } = require('canvas');
 const fs = require('fs');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
+const { chromium } = require('playwright');
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -99,7 +100,7 @@ app.get('/api/tiles', (req, res) => {
 });
 
 // Only allow completing revealed tiles
-app.post('/api/tiles/complete/:id', (req, res) => {
+app.post('/api/tiles/complete/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
@@ -156,13 +157,33 @@ app.post('/api/tiles/complete/:id', (req, res) => {
     if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
       const nIdx = r * SIZE + c;
       if (!mazeState[nIdx].completed) {
-        // Mark as revealed (but not completed)
-        // No-op: in this model, revealed = not completed but adjacent to a completed tile
-        // The frontend should show these as revealed based on neighbor logic
+        // No-op: revealed = not completed but adjacent to a completed tile
       }
     }
   }
-  res.json({ success: true, tile });
+  // --- SCREENSHOT LOGIC ---
+  try {
+    const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
+    const browser = await chromium.launch({ args: ['--no-sandbox'] });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle' });
+    // Hide the button panel before screenshot
+    await page.evaluate(() => {
+      const panel = document.querySelector('.button-panel');
+      if (panel) panel.classList.add('hide-for-screenshot');
+    });
+    const screenshot = await page.screenshot({ fullPage: true });
+    // Restore the button panel
+    await page.evaluate(() => {
+      const panel = document.querySelector('.button-panel');
+      if (panel) panel.classList.remove('hide-for-screenshot');
+    });
+    await browser.close();
+    res.set('Content-Type', 'image/png');
+    res.send(screenshot);
+  } catch (err) {
+    res.status(500).json({ error: 'Screenshot failed', details: err.message });
+  }
 });
 
 // Real browser screenshot endpoint

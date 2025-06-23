@@ -46,8 +46,20 @@ client.on('interactionCreate', async interaction => {
     const id = interaction.options.getInteger('id');
     try {
       const res = await fetch(`${API_BASE}/tiles/complete/${id}`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to complete tile');
-      await interaction.reply(`Tile ${id} completed!`);
+      if (!res.ok) {
+        // Try to parse error message from JSON
+        let errMsg = 'Failed to complete tile';
+        try {
+          const errJson = await res.json();
+          if (errJson && errJson.error) errMsg = errJson.error;
+        } catch {}
+        throw new Error(errMsg);
+      }
+      const buffer = Buffer.from(await res.arrayBuffer());
+      await interaction.reply({
+        content: `Tile ${id} completed! Here is the updated maze:`,
+        files: [{ attachment: buffer, name: `maze-tile-${id}.png` }]
+      });
     } catch (e) {
       await interaction.reply({ content: `Error: ${e.message}`, ephemeral: true });
     }

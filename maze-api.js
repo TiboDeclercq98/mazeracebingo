@@ -214,12 +214,29 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
         if (candidates.length > 0) {
           const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
           mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
-          // Respond with boobytrap message for Discord bot
-          return res.json({
-            boobytrap: true,
-            message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion`,
-            tile: mazeState[pickIdx]
-          });
+          saveMazeToDb(); // Save before screenshot
+          try {
+            const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
+            const browser = await chromium.launch({ args: ['--no-sandbox'] });
+            const page = await browser.newPage();
+            await page.goto(url, { waitUntil: 'networkidle' });
+            await page.evaluate(() => {
+              const panel = document.querySelector('.button-panel');
+              if (panel) panel.classList.add('hide-for-screenshot');
+            });
+            const screenshot = await page.screenshot({ fullPage: true });
+            await page.evaluate(() => {
+              const panel = document.querySelector('.button-panel');
+              if (panel) panel.classList.remove('hide-for-screenshot');
+            });
+            await browser.close();
+            res.set('Content-Type', 'image/png');
+            res.set('X-Boobytrap-Message', `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion`);
+            return res.send(screenshot);
+          } catch (err) {
+            res.set('X-Boobytrap-Message', `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion (screenshot failed)`);
+            return res.status(500).end();
+          }
         }
       }
       // --- END BOOBYTRAP LOGIC ---

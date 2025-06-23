@@ -57,8 +57,10 @@ client.on('interactionCreate', async interaction => {
         throw new Error(errMsg);
       }
       const buffer = Buffer.from(await res.arrayBuffer());
+      // Check for boobytrap message header
+      const boobytrapMsg = res.headers.get('x-boobytrap-message');
       await interaction.editReply({
-        content: `Tile ${id} completed! Here is the updated maze:`,
+        content: boobytrapMsg ? boobytrapMsg : `Tile ${id} completed! Here is the updated maze:`,
         files: [{ attachment: buffer, name: `maze-tile-${id}.png` }]
       });
     } catch (e) {

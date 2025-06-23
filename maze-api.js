@@ -220,6 +220,8 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
             const browser = await chromium.launch({ args: ['--no-sandbox'] });
             const page = await browser.newPage();
             await page.goto(url, { waitUntil: 'networkidle' });
+            // Wait for frontend to re-render (ensure state is loaded)
+            await page.waitForTimeout(400);
             await page.evaluate(() => {
               const panel = document.querySelector('.button-panel');
               if (panel) panel.classList.add('hide-for-screenshot');
@@ -308,6 +310,8 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
                 const browser = await chromium.launch({ args: ['--no-sandbox'] });
                 const page = await browser.newPage();
                 await page.goto(url, { waitUntil: 'networkidle' });
+                // Wait for frontend to re-render (ensure state is loaded)
+                await page.waitForTimeout(400);
                 await page.evaluate(() => {
                   const panel = document.querySelector('.button-panel');
                   if (panel) panel.classList.add('hide-for-screenshot');

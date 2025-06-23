@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Left
             if (col > 0) {
-                const nIdx = row * size + (col - 1);
+                const nIdx = row * state.size + (col - 1);
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.left) &&
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Right
             if (col < state.size - 1) {
-                const nIdx = row * size + (col + 1);
+                const nIdx = row * state.size + (col + 1);
                 const nWallObj = getWallObj(nIdx);
                 if (
                     (!wallObj || !wallObj.walls.right) &&

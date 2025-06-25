@@ -117,11 +117,38 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
-  // Only allow if tile is revealed (completed neighbor with no wall or is START/END)
+  // Declare these once at the top
   const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
   const endId = Math.floor(SIZE / 2) + 1;
   const isStart = id === startId;
   const isEnd = id === endId;
+  let specialEvent = null; // { type: 'boobytrap'|'chest', message: string }
+
+  // If tile is already completed, just return a screenshot (for Discord bot UX)
+  if (tile.completed) {
+    try {
+      const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
+      const browser = await chromium.launch({ args: ['--no-sandbox'] });
+      const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'networkidle' });
+      await page.evaluate(() => {
+        const panel = document.querySelector('.button-panel');
+        if (panel) panel.classList.add('hide-for-screenshot');
+      });
+      const screenshot = await page.screenshot({ fullPage: true });
+      await page.evaluate(() => {
+        const panel = document.querySelector('.button-panel');
+        if (panel) panel.classList.remove('hide-for-screenshot');
+      });
+      await browser.close();
+      res.set('Content-Type', 'image/png');
+      res.send(screenshot);
+    } catch (err) {
+      res.status(500).json({ error: 'Screenshot failed', details: err.message });
+    }
+    return;
+  }
+  // Only allow if tile is revealed (completed neighbor with no wall or is START/END)
   if (!tile.completed && !isStart) { // REMOVE !isEnd exception
     const idx = id - 1;
     const row = Math.floor(idx / SIZE);
@@ -166,8 +193,6 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
       const isBoobytrap = boobytrapPositions.some(b => b.row === row && b.col === col);
       if (isBoobytrap) {
         // Find all revealed, uncompleted, non-START/END tiles
-        const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
-        const endId = Math.floor(SIZE / 2) + 1;
         // Helper to get wall object
         function getWallObj(r, c) {
           return mazeWalls.find(w => w.row === r && w.col === c);
@@ -225,8 +250,6 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
       const deadendRow = Math.floor(deadendIdx / SIZE);
       const deadendCol = deadendIdx % SIZE;
       const wallObj = mazeWalls.find(w => w.row === deadendRow && w.col === deadendCol);
-      const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
-      const endId = Math.floor(SIZE / 2) + 1;
       if (wallObj && id !== startId && id !== endId) {
         const wallCount = ['top', 'right', 'bottom', 'left'].reduce((count, dir) => count + (wallObj.walls[dir] ? 1 : 0), 0);
         if (wallCount === 3) {
@@ -340,14 +363,24 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
     }
     res.send(screenshot);
   } catch (err) {
+    // Log error for debugging
+    console.error('Screenshot failed:', err);
+    // Return a 200 with a 1x1 PNG and error header so Discord bot can show fallback
+    const png1x1 = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=',
+      'base64'
+    );
+    res.set('Content-Type', 'image/png');
     if (specialEvent) {
       if (specialEvent.type === 'boobytrap') {
         res.set('X-Boobytrap-Message', specialEvent.message + ' (screenshot failed)');
       } else if (specialEvent.type === 'chest') {
         res.set('X-Chest-Message', specialEvent.message + ' (screenshot failed)');
       }
+    } else {
+      res.set('X-Error-Message', 'Screenshot failed: ' + err.message);
     }
-    res.status(500).json({ error: 'Screenshot failed', details: err.message });
+    res.send(png1x1);
   }
 });
 

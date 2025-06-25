@@ -122,8 +122,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   const endId = Math.floor(SIZE / 2) + 1;
   const isStart = id === startId;
   const isEnd = id === endId;
-  let specialEvent = null; // { type: 'boobytrap'|'chest', message: string }
-  if (!tile.completed && !isStart && !isEnd) {
+  if (!tile.completed && !isStart) { // REMOVE !isEnd exception
     const idx = id - 1;
     const row = Math.floor(idx / SIZE);
     const col = idx % SIZE;

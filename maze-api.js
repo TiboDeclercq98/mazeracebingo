@@ -122,6 +122,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   const endId = Math.floor(SIZE / 2) + 1;
   const isStart = id === startId;
   const isEnd = id === endId;
+  let specialEvent = null; // { type: 'boobytrap'|'chest', message: string }
   if (!tile.completed && !isStart && !isEnd) {
     const idx = id - 1;
     const row = Math.floor(idx / SIZE);
@@ -215,30 +216,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
           const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
           mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
           saveMazeToDb(); // Save before screenshot
-          try {
-            const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
-            const browser = await chromium.launch({ args: ['--no-sandbox'] });
-            const page = await browser.newPage();
-            await page.goto(url, { waitUntil: 'networkidle' });
-            // Wait for frontend to re-render (ensure state is loaded)
-            await page.waitForTimeout(400);
-            await page.evaluate(() => {
-              const panel = document.querySelector('.button-panel');
-              if (panel) panel.classList.add('hide-for-screenshot');
-            });
-            const screenshot = await page.screenshot({ fullPage: true });
-            await page.evaluate(() => {
-              const panel = document.querySelector('.button-panel');
-              if (panel) panel.classList.remove('hide-for-screenshot');
-            });
-            await browser.close();
-            res.set('Content-Type', 'image/png');
-            res.set('X-Boobytrap-Message', `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion`);
-            return res.send(screenshot);
-          } catch (err) {
-            res.set('X-Boobytrap-Message', `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion (screenshot failed)`);
-            return res.status(500).end();
-          }
+          specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion` };
         }
       }
       // --- END BOOBYTRAP LOGIC ---
@@ -304,34 +282,11 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
               mazeState[pickIdx].completed = true;
               mazeState[pickIdx].completionsDone = 0;
               saveMazeToDb();
-              // Take screenshot and send chest message header
-              try {
-                const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
-                const browser = await chromium.launch({ args: ['--no-sandbox'] });
-                const page = await browser.newPage();
-                await page.goto(url, { waitUntil: 'networkidle' });
-                // Wait for frontend to re-render (ensure state is loaded)
-                await page.waitForTimeout(400);
-                await page.evaluate(() => {
-                  const panel = document.querySelector('.button-panel');
-                  if (panel) panel.classList.add('hide-for-screenshot');
-                });
-                const screenshot = await page.screenshot({ fullPage: true });
-                await page.evaluate(() => {
-                  const panel = document.querySelector('.button-panel');
-                  if (panel) panel.classList.remove('hide-for-screenshot');
-                });
-                await browser.close();
-                res.set('Content-Type', 'image/png');
-                res.set('X-Chest-Message', `You found a chest, tile ${mazeState[pickIdx].id} has been completed`);
-                return res.send(screenshot);
-              } catch (err) {
-                res.set('X-Chest-Message', `You found a chest, tile ${mazeState[pickIdx].id} has been completed (screenshot failed)`);
-                return res.status(500).end();
-              }
+              specialEvent = { type: 'chest', message: `You found a chest, tile ${mazeState[pickIdx].id} has been completed` };
             } else {
               // If not fully completed, still save state and continue
               saveMazeToDb();
+              specialEvent = { type: 'chest', message: `You found a chest! Tile ${mazeState[pickIdx].id} needs one less completion` };
             }
           }
         }
@@ -377,8 +332,22 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
     });
     await browser.close();
     res.set('Content-Type', 'image/png');
+    if (specialEvent) {
+      if (specialEvent.type === 'boobytrap') {
+        res.set('X-Boobytrap-Message', specialEvent.message);
+      } else if (specialEvent.type === 'chest') {
+        res.set('X-Chest-Message', specialEvent.message);
+      }
+    }
     res.send(screenshot);
   } catch (err) {
+    if (specialEvent) {
+      if (specialEvent.type === 'boobytrap') {
+        res.set('X-Boobytrap-Message', specialEvent.message + ' (screenshot failed)');
+      } else if (specialEvent.type === 'chest') {
+        res.set('X-Chest-Message', specialEvent.message + ' (screenshot failed)');
+      }
+    }
     res.status(500).json({ error: 'Screenshot failed', details: err.message });
   }
 });

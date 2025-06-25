@@ -411,9 +411,13 @@ app.post('/api/create', (req, res) => {
     loaded = typeof saveData === 'string' ? JSON.parse(saveData) : saveData;
     if (loaded && Array.isArray(loaded.mazeWalls)) {
       mazeWalls = loaded.mazeWalls;
-      mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({
+      // Always use loaded.size if present, otherwise default to SIZE
+      const mazeSize = loaded.size || SIZE;
+      mazeState = Array(mazeSize * mazeSize).fill().map((_, i) => ({
         id: i + 1,
         completed: false,
+        completionsRequired: 1,
+        completionsDone: 0
       }));
       boobytrapPositions = loaded.boobytraps || [];
       tileDescriptions = loaded.tileDescriptions || {};

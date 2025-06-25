@@ -329,6 +329,9 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
                 res.set('X-Chest-Message', `You found a chest, tile ${mazeState[pickIdx].id} has been completed (screenshot failed)`);
                 return res.status(500).end();
               }
+            } else {
+              // If not fully completed, still save state and continue
+              saveMazeToDb();
             }
           }
         }

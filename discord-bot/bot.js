@@ -39,43 +39,57 @@ client.once('ready', () => {
   registerCommands();
 });
 
+const completionInProgress = new Set();
+
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'completetile') {
-    const id = interaction.options.getInteger('id');
+    const channelId = interaction.channelId;
+    if (completionInProgress.has(channelId)) {
+      await interaction.reply({ content: 'Please wait for the previous completion to finish in this channel.', ephemeral: true });
+      return;
+    }
+    completionInProgress.add(channelId);
     try {
       await interaction.deferReply(); // Acknowledge immediately to avoid timeout
+      const id = interaction.options.getInteger('id');
       const res = await fetch(`${API_BASE}/tiles/complete/${id}`, { method: 'POST' });
-      if (!res.ok) {
-        // Try to parse error message from JSON
-        let errMsg = 'Failed to complete tile';
-        try {
-          const errJson = await res.json();
-          if (errJson && errJson.error) errMsg = errJson.error;
-        } catch {}
-        throw new Error(errMsg);
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.startsWith('image/png')) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        // Check for boobytrap or chest message header (case-insensitive, log all headers for debug)
+        let specialMsg = res.headers.get('x-boobytrap-message');
+        if (!specialMsg) {
+          specialMsg = res.headers.get('x-chest-message');
+        }
+        if (!specialMsg) {
+          // Try alternate casing (node-fetch sometimes lowercases headers)
+          specialMsg = res.headers.get('X-Boobytrap-Message') || res.headers.get('X-BOOBYTRAP-MESSAGE') || res.headers.get('X-Chest-Message') || res.headers.get('X-CHEST-MESSAGE');
+        }
+        if (!specialMsg) {
+          // Debug: log all headers to help diagnose
+          console.log('Headers received:', Object.fromEntries(res.headers.entries()));
+        }
+        await interaction.editReply({
+          content: specialMsg ? specialMsg : `Tile ${id} completed! Here is the updated maze:`,
+          files: [{ attachment: buffer, name: `maze-tile-${id}.png` }]
+        });
+      } else {
+        // JSON response (already completed or error)
+        const data = await res.json();
+        if (data.alreadyCompleted) {
+          await interaction.editReply({ content: `Tile ${id} is already completed!`, flags: 64 });
+        } else if (data.error) {
+          await interaction.editReply({ content: `Error: ${data.error}`, flags: 64 });
+        } else {
+          await interaction.editReply({ content: `Unknown response from server.`, flags: 64 });
+        }
       }
-      const buffer = Buffer.from(await res.arrayBuffer());
-      // Check for boobytrap or chest message header (case-insensitive, log all headers for debug)
-      let specialMsg = res.headers.get('x-boobytrap-message');
-      if (!specialMsg) {
-        specialMsg = res.headers.get('x-chest-message');
-      }
-      if (!specialMsg) {
-        // Try alternate casing (node-fetch sometimes lowercases headers)
-        specialMsg = res.headers.get('X-Boobytrap-Message') || res.headers.get('X-BOOBYTRAP-MESSAGE') || res.headers.get('X-Chest-Message') || res.headers.get('X-CHEST-MESSAGE');
-      }
-      if (!specialMsg) {
-        // Debug: log all headers to help diagnose
-        console.log('Headers received:', Object.fromEntries(res.headers.entries()));
-      }
-      await interaction.editReply({
-        content: specialMsg ? specialMsg : `Tile ${id} completed! Here is the updated maze:`,
-        files: [{ attachment: buffer, name: `maze-tile-${id}.png` }]
-      });
     } catch (e) {
       await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
+    } finally {
+      completionInProgress.delete(channelId);
     }
   }
 

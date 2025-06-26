@@ -124,29 +124,9 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   const isEnd = id === endId;
   let specialEvent = null; // { type: 'boobytrap'|'chest', message: string }
 
-  // If tile is already completed, just return a screenshot (for Discord bot UX)
+  // If tile is already completed, just return a JSON response (do not send screenshot)
   if (tile.completed) {
-    try {
-      const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
-      const browser = await chromium.launch({ args: ['--no-sandbox'] });
-      const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle' });
-      await page.evaluate(() => {
-        const panel = document.querySelector('.button-panel');
-        if (panel) panel.classList.add('hide-for-screenshot');
-      });
-      const screenshot = await page.screenshot({ fullPage: true });
-      await page.evaluate(() => {
-        const panel = document.querySelector('.button-panel');
-        if (panel) panel.classList.remove('hide-for-screenshot');
-      });
-      await browser.close();
-      res.set('Content-Type', 'image/png');
-      res.send(screenshot);
-    } catch (err) {
-      res.status(500).json({ error: 'Screenshot failed', details: err.message });
-    }
-    return;
+    return res.json({ success: false, alreadyCompleted: true, tile });
   }
   // Only allow if tile is revealed (completed neighbor with no wall or is START/END)
   if (!tile.completed && !isStart) { // REMOVE !isEnd exception

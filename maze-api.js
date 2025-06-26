@@ -26,21 +26,31 @@ let tileDescriptions = {}; // New state for tile descriptions
 const DB_PATH = 'maze.db';
 const db = new sqlite3.Database(DB_PATH);
 
-// --- DB MIGRATION: Add completionsRequired and completionsDone columns if not exist ---
+// --- DB MIGRATION: Add completionsRequired, completionsDone, and team columns if not exist ---
 db.serialize(() => {
   db.get("PRAGMA table_info(tiles)", (err, info) => {
     db.run(`ALTER TABLE tiles ADD COLUMN completionsRequired INTEGER DEFAULT 1`, () => {});
     db.run(`ALTER TABLE tiles ADD COLUMN completionsDone INTEGER DEFAULT 0`, () => {});
+    db.run(`ALTER TABLE tiles ADD COLUMN team TEXT DEFAULT ''`, () => {});
+  });
+  db.get("PRAGMA table_info(walls)", (err, info) => {
+    db.run(`ALTER TABLE walls ADD COLUMN team TEXT DEFAULT ''`, () => {});
+  });
+  db.get("PRAGMA table_info(boobytraps)", (err, info) => {
+    db.run(`ALTER TABLE boobytraps ADD COLUMN team TEXT DEFAULT ''`, () => {});
+  });
+  db.get("PRAGMA table_info(tileDescriptions)", (err, info) => {
+    db.run(`ALTER TABLE tileDescriptions ADD COLUMN team TEXT DEFAULT ''`, () => {});
   });
 });
 
 // Initialize DB tables if not exist
 function initDb() {
   db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS tiles (id INTEGER PRIMARY KEY, completed INTEGER, completionsRequired INTEGER DEFAULT 1, completionsDone INTEGER DEFAULT 0)`);
-    db.run(`CREATE TABLE IF NOT EXISTS walls (row INTEGER, col INTEGER, walls TEXT)`);
-    db.run(`CREATE TABLE IF NOT EXISTS boobytraps (row INTEGER, col INTEGER)`);
-    db.run(`CREATE TABLE IF NOT EXISTS tileDescriptions (tileId INTEGER PRIMARY KEY, description TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS tiles (id INTEGER, team TEXT, completed INTEGER, completionsRequired INTEGER DEFAULT 1, completionsDone INTEGER DEFAULT 0, PRIMARY KEY (id, team))`);
+    db.run(`CREATE TABLE IF NOT EXISTS walls (row INTEGER, col INTEGER, team TEXT, walls TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS boobytraps (row INTEGER, col INTEGER, team TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS tileDescriptions (tileId INTEGER, team TEXT, description TEXT, PRIMARY KEY (tileId, team))`);
   });
 }
 initDb();

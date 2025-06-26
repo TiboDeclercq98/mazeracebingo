@@ -128,3 +128,29 @@ function saveMazeToDb(team) {
     .then(() => {
       const wallInserts = mazeWalls.map(w => dbQuery(
         'INSERT INTO walls (row, col, team, walls) VALUES (?, ?, ?, ?)',
+        [w.row, w.col, team, JSON.stringify(w.walls)]
+      ));
+      return Promise.all(wallInserts);
+    })
+    .then(() => dbQuery('DELETE FROM boobytraps WHERE team = ?', [team]))
+    .then(() => {
+      const trapInserts = boobytrapPositions.map(b => dbQuery(
+        'INSERT INTO boobytraps (row, col, team) VALUES (?, ?, ?)',
+        [b.row, b.col, team]
+      ));
+      return Promise.all(trapInserts);
+    })
+    .then(() => dbQuery('DELETE FROM tileDescriptions WHERE team = ?', [team]))
+    .then(() => {
+      const descInserts = Object.entries(tileDescriptions).map(([tileId, description]) => dbQuery(
+        'INSERT INTO tileDescriptions (tileId, team, description) VALUES (?, ?, ?)',
+        [tileId, team, description]
+      ));
+      return Promise.all(descInserts);
+    })
+    .catch(err => {
+      console.error('Error saving maze to DB:', err);
+    });
+}
+
+// (If there are more routes or exports, they should follow here)

@@ -335,7 +335,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   }
   // --- SCREENSHOT LOGIC ---
   try {
-    const url = process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/';
+    const url = (process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/') + `?team=${encodeURIComponent(team)}`;
     const browser = await chromium.launch({ args: ['--no-sandbox'] });
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle' });

@@ -123,7 +123,15 @@ client.on('interactionCreate', async interaction => {
       } else {
         res = await fetch(`${API_BASE}/create?team=${encodeURIComponent(team)}`, { method: 'POST' });
       }
-      if (!res.ok) throw new Error('Failed to create maze');
+      if (!res.ok) {
+        let errorMsg = 'Failed to create maze';
+        try {
+          const data = await res.json();
+          if (data && data.error) errorMsg = data.error;
+        } catch {}
+        await interaction.editReply({ content: `Error: ${errorMsg}`, flags: 64 });
+        return;
+      }
       await interaction.editReply('New maze created!');
     } catch (e) {
       await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });

@@ -2,9 +2,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById('grid');
     let tiles = [];
 
+    // --- TEAM PARAMETER SUPPORT ---
+    function getTeamFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('team') || 'default';
+    }
+
     // --- API-DRIVEN MAZE RENDERING ---
     async function fetchMazeState() {
-        const res = await fetch('https://mazeracebingo.onrender.com/api/maze');
+        const team = getTeamFromUrl();
+        const res = await fetch(`https://mazeracebingo.onrender.com/api/maze?team=${encodeURIComponent(team)}`);
         return await res.json();
     }
 
@@ -197,7 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tile.onclick = async () => {
                 if (tile.dataset.visible === 'true' && !tile.classList.contains('clicked') && tile.textContent !== 'END') {
                     const tileId = parseInt(tile.dataset.number, 10);
-                    await fetch(`https://mazeracebingo-1.onrender.com/api/tiles/complete/${tileId}`, { method: 'POST' });
+                    const team = getTeamFromUrl();
+                    await fetch(`https://mazeracebingo-1.onrender.com/api/tiles/complete/${tileId}?team=${encodeURIComponent(team)}`, { method: 'POST' });
                     await renderMazeFromAPI();
                 }
             };

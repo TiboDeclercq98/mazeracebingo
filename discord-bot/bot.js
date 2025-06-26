@@ -13,7 +13,8 @@ const commands = [
     .addIntegerOption(option => option.setName('id').setDescription('Tile ID').setRequired(true)),
   new SlashCommandBuilder()
     .setName('createmaze')
-    .setDescription('Create a new maze'),
+    .setDescription('Create a new maze')
+    .addAttachmentOption(option => option.setName('savefile').setDescription('Optional save file (JSON)').setRequired(false)),
   new SlashCommandBuilder()
     .setName('fetchmaze')
     .setDescription('Fetch the current maze state'),
@@ -44,6 +45,9 @@ const completionInProgress = new Set();
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
+  // Get the team name from the channel name
+  const team = interaction.channel?.name;
+
   if (interaction.commandName === 'completetile') {
     const channelId = interaction.channelId;
     if (completionInProgress.has(channelId)) {
@@ -54,7 +58,8 @@ client.on('interactionCreate', async interaction => {
     try {
       await interaction.deferReply(); // Acknowledge immediately to avoid timeout
       const id = interaction.options.getInteger('id');
-      const res = await fetch(`${API_BASE}/tiles/complete/${id}`, { method: 'POST' });
+      // Pass team as a query parameter
+      const res = await fetch(`${API_BASE}/tiles/complete/${id}?team=${encodeURIComponent(team)}`, { method: 'POST' });
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.startsWith('image/png')) {
         const buffer = Buffer.from(await res.arrayBuffer());
@@ -96,7 +101,21 @@ client.on('interactionCreate', async interaction => {
   if (interaction.commandName === 'createmaze') {
     try {
       await interaction.deferReply();
-      const res = await fetch(`${API_BASE}/create`, { method: 'POST' });
+      // Pass team as a query parameter
+      const saveFile = interaction.options.getAttachment('savefile');
+      let res;
+      if (saveFile) {
+        // Download the file and send its content as saveData
+        const fileRes = await fetch(saveFile.url);
+        const saveData = await fileRes.text();
+        res = await fetch(`${API_BASE}/create?team=${encodeURIComponent(team)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ saveData })
+        });
+      } else {
+        res = await fetch(`${API_BASE}/create?team=${encodeURIComponent(team)}`, { method: 'POST' });
+      }
       if (!res.ok) throw new Error('Failed to create maze');
       await interaction.editReply('New maze created!');
     } catch (e) {
@@ -107,7 +126,8 @@ client.on('interactionCreate', async interaction => {
   if (interaction.commandName === 'fetchmaze') {
     try {
       await interaction.deferReply();
-      const res = await fetch(`${API_BASE}/tiles`);
+      // Pass team as a query parameter
+      const res = await fetch(`${API_BASE}/tiles?team=${encodeURIComponent(team)}`);
       const data = await res.json();
       await interaction.editReply('Current maze state: ' + JSON.stringify(data));
     } catch (e) {

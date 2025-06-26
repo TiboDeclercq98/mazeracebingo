@@ -45,22 +45,22 @@ function initDb() {
 }
 initDb();
 
-// Load maze state from DB
-function loadMazeFromDb(callback) {
+// --- TEAM-AWARE DB HELPERS ---
+function loadMazeFromDb(team, callback) {
   db.serialize(() => {
-    db.all('SELECT * FROM tiles', (err, tiles) => {
-      if (!err && tiles.length === SIZE * SIZE) {
+    db.all('SELECT * FROM tiles WHERE team = ?', [team], (err, tiles) => {
+      if (!err && tiles.length > 0) {
         mazeState = tiles.map(t => ({
           id: t.id,
           completed: !!t.completed,
           completionsRequired: t.completionsRequired !== undefined ? t.completionsRequired : 1,
           completionsDone: t.completionsDone !== undefined ? t.completionsDone : 0
         }));
-        db.all('SELECT * FROM walls', (err, rows) => {
+        db.all('SELECT * FROM walls WHERE team = ?', [team], (err, rows) => {
           mazeWalls = rows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
-          db.all('SELECT * FROM boobytraps', (err, traps) => {
+          db.all('SELECT * FROM boobytraps WHERE team = ?', [team], (err, traps) => {
             boobytrapPositions = traps.map(t => ({ row: t.row, col: t.col }));
-            db.all('SELECT * FROM tileDescriptions', (err, descs) => {
+            db.all('SELECT * FROM tileDescriptions WHERE team = ?', [team], (err, descs) => {
               tileDescriptions = {};
               descs.forEach(d => { tileDescriptions[d.tileId] = d.description; });
               if (callback) callback();
@@ -68,52 +68,60 @@ function loadMazeFromDb(callback) {
           });
         });
       } else {
-        // DB is empty or corrupt, initialize default maze and save
+        // DB is empty for this team, initialize default maze and save
         mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({ id: i + 1, completed: false, completionsRequired: 1, completionsDone: 0 }));
         mazeWalls = [];
         boobytrapPositions = [];
         tileDescriptions = {};
-        saveMazeToDb();
+        saveMazeToDb(team);
         if (callback) callback();
       }
     });
   });
 }
 
-// Save maze state to DB
-function saveMazeToDb() {
+function saveMazeToDb(team) {
   db.serialize(() => {
-    db.run('DELETE FROM tiles');
-    const tileStmt = db.prepare('INSERT INTO tiles (id, completed, completionsRequired, completionsDone) VALUES (?, ?, ?, ?)');
-    mazeState.forEach(t => tileStmt.run(t.id, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0));
+    db.run('DELETE FROM tiles WHERE team = ?', [team]);
+    const tileStmt = db.prepare('INSERT INTO tiles (id, team, completed, completionsRequired, completionsDone) VALUES (?, ?, ?, ?, ?)');
+    mazeState.forEach(t => tileStmt.run(t.id, team, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0));
     tileStmt.finalize();
-    db.run('DELETE FROM walls');
-    const wallStmt = db.prepare('INSERT INTO walls (row, col, walls) VALUES (?, ?, ?)');
-    mazeWalls.forEach(w => wallStmt.run(w.row, w.col, JSON.stringify(w.walls)));
+    db.run('DELETE FROM walls WHERE team = ?', [team]);
+    const wallStmt = db.prepare('INSERT INTO walls (row, col, team, walls) VALUES (?, ?, ?, ?)');
+    mazeWalls.forEach(w => wallStmt.run(w.row, w.col, team, JSON.stringify(w.walls)));
     wallStmt.finalize();
-    db.run('DELETE FROM boobytraps');
-    const trapStmt = db.prepare('INSERT INTO boobytraps (row, col) VALUES (?, ?)');
-    boobytrapPositions.forEach(b => trapStmt.run(b.row, b.col));
+    db.run('DELETE FROM boobytraps WHERE team = ?', [team]);
+    const trapStmt = db.prepare('INSERT INTO boobytraps (row, col, team) VALUES (?, ?, ?)');
+
+    boobytrapPositions.forEach(b => trapStmt.run(b.row, b.col, team));
     trapStmt.finalize();
-    db.run('DELETE FROM tileDescriptions');
-    const descStmt = db.prepare('INSERT INTO tileDescriptions (tileId, description) VALUES (?, ?)');
-    Object.entries(tileDescriptions).forEach(([id, desc]) => descStmt.run(id, desc));
+    db.run('DELETE FROM tileDescriptions WHERE team = ?', [team]);
+    const descStmt = db.prepare('INSERT INTO tileDescriptions (tileId, team, description) VALUES (?, ?, ?)');
+
+    Object.entries(tileDescriptions).forEach(([id, desc]) => descStmt.run(id, team, desc));
     descStmt.finalize();
   });
 }
 
 // Load maze from DB on server start
-loadMazeFromDb(() => {
+loadMazeFromDb('default', () => {
   console.log('Maze state loaded from database');
 });
 
 // Fetch all tiles
 app.get('/api/tiles', (req, res) => {
-  res.json(mazeState);
+  const team = req.query.team;
+  if (!team) return res.status(400).json({ error: 'Missing team' });
+  loadMazeFromDb(team, () => {
+    res.json(mazeState);
+  });
 });
 
 // Only allow completing revealed tiles
 app.post('/api/tiles/complete/:id', async (req, res) => {
+  const team = req.query.team;
+  if (!team) return res.status(400).json({ error: 'Missing team' });
+  await new Promise(resolve => loadMazeFromDb(team, resolve));
   const id = parseInt(req.params.id, 10);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
@@ -219,7 +227,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
         if (candidates.length > 0) {
           const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
           mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
-          saveMazeToDb(); // Save before screenshot
+          saveMazeToDb(team); // Save before screenshot
           specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion` };
         }
       }
@@ -283,11 +291,11 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
               mazeState[pickIdx].completionsRequired = 0;
               mazeState[pickIdx].completed = true;
               mazeState[pickIdx].completionsDone = 0;
-              saveMazeToDb();
+              saveMazeToDb(team);
               specialEvent = { type: 'chest', message: `You found a chest, tile ${mazeState[pickIdx].id} has been completed` };
             } else {
               // If not fully completed, still save state and continue
-              saveMazeToDb();
+              saveMazeToDb(team);
               specialEvent = { type: 'chest', message: `You found a chest! Tile ${mazeState[pickIdx].id} needs one less completion` };
             }
           }
@@ -296,7 +304,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
       // --- END DEAD-END LOGIC ---
     }
   }
-  saveMazeToDb();
+  saveMazeToDb(team);
   // Reveal neighbors (set their completed=false if not already present)
   const idx = id - 1;
   const row = Math.floor(idx / SIZE);
@@ -366,28 +374,38 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
 
 // Real browser screenshot endpoint
 app.get('/api/current', (req, res) => {
-  res.json({
-    size: SIZE,
-    walls: mazeWalls,
-    tiles: mazeState,
-    boobytraps: boobytrapPositions,
-    tileDescriptions
+  const team = req.query.team;
+  if (!team) return res.status(400).json({ error: 'Missing team' });
+  loadMazeFromDb(team, () => {
+    res.json({
+      size: SIZE,
+      walls: mazeWalls,
+      tiles: mazeState,
+      boobytraps: boobytrapPositions,
+      tileDescriptions
+    });
   });
 });
 
 // New endpoint: fetch full maze state
 app.get('/api/maze', (req, res) => {
-  res.json({
-    size: SIZE,
-    walls: mazeWalls,
-    tiles: mazeState,
-    boobytraps: boobytrapPositions,
-    tileDescriptions // Include tileDescriptions in the response
+  const team = req.query.team;
+  if (!team) return res.status(400).json({ error: 'Missing team' });
+  loadMazeFromDb(team, () => {
+    res.json({
+      size: SIZE,
+      walls: mazeWalls,
+      tiles: mazeState,
+      boobytraps: boobytrapPositions,
+      tileDescriptions // Include tileDescriptions in the response
+    });
   });
 });
 
 // Create a new maze from save file content
 app.post('/api/create', (req, res) => {
+  const team = req.query.team;
+  if (!team) return res.status(400).json({ error: 'Missing team' });
   const { saveData } = req.body;
   if (!saveData) return res.status(400).json({ error: 'Missing saveData' });
   let loaded;
@@ -395,7 +413,6 @@ app.post('/api/create', (req, res) => {
     loaded = typeof saveData === 'string' ? JSON.parse(saveData) : saveData;
     if (loaded && Array.isArray(loaded.mazeWalls)) {
       mazeWalls = loaded.mazeWalls;
-      // Always use loaded.size if present, otherwise default to SIZE
       const mazeSize = loaded.size || SIZE;
       mazeState = Array(mazeSize * mazeSize).fill().map((_, i) => ({
         id: i + 1,
@@ -405,7 +422,7 @@ app.post('/api/create', (req, res) => {
       }));
       boobytrapPositions = loaded.boobytraps || [];
       tileDescriptions = loaded.tileDescriptions || {};
-      saveMazeToDb();
+      saveMazeToDb(team);
       res.json({ success: true });
     } else {
       return res.status(400).json({ error: 'Invalid save file format' });
@@ -457,7 +474,7 @@ app.post('/api/tiles/uncomplete/:id', (req, res) => {
   if (tile.completionsDone < (tile.completionsRequired || 1)) {
     tile.completed = false;
   }
-  saveMazeToDb();
+  saveMazeToDb(team);
   // Unreveal relevant tiles: unreveal any neighbor that is not adjacent to any other completed tile
   for (const { r, c } of neighbors) {
     if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {

@@ -107,7 +107,14 @@ client.on('interactionCreate', async interaction => {
       if (saveFile) {
         // Download the file and send its content as saveData
         const fileRes = await fetch(saveFile.url);
-        const saveData = await fileRes.text();
+        const saveText = await fileRes.text();
+        let saveData;
+        try {
+          saveData = JSON.parse(saveText);
+        } catch (err) {
+          await interaction.editReply({ content: 'Invalid JSON in save file.', flags: 64 });
+          return;
+        }
         res = await fetch(`${API_BASE}/create?team=${encodeURIComponent(team)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

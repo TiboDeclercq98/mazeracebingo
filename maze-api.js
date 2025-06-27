@@ -369,7 +369,9 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   } catch (err) {
     console.error('Screenshot failed:', err);
     // On screenshot error, return JSON error instead of PNG
-    return res.status(500).json({ error: 'Screenshot failed', details: err.message, specialEvent });
+    if (!res.headersSent) {
+      res.status(500).type('application/json').json({ error: 'Screenshot failed', details: err.message, specialEvent });
+    }
   }
 });
 
@@ -477,8 +479,7 @@ app.post('/api/tiles/uncomplete/:id', (req, res) => {
   res.json({ success: true, tile });
 });
 
-// Start the Express server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Maze Bingo API running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

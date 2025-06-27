@@ -90,12 +90,12 @@ function loadMazeFromDb(team, callback) {
         mazeWalls = [];
         boobytrapPositions = [];
         tileDescriptions = {};
-        saveMazeToDb(team);
-        if (callback) callback();
-        return Promise.reject('DB is empty for this team');
+        // Wait for saveMazeToDb to finish before callback
+        return saveMazeToDb(team).then(() => null);
       }
     })
     .then(rows => {
+      if (!rows) return dbQuery('SELECT * FROM walls WHERE team = ?', [team]);
       mazeWalls = rows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
       return dbQuery('SELECT * FROM boobytraps WHERE team = ?', [team]);
     })
@@ -115,8 +115,7 @@ function loadMazeFromDb(team, callback) {
 }
 
 function saveMazeToDb(team) {
-  // Delete and insert all for this team
-  dbQuery('DELETE FROM tiles WHERE team = ?', [team])
+  return dbQuery('DELETE FROM tiles WHERE team = ?', [team])
     .then(() => {
       const tileInserts = mazeState.map(t => dbQuery(
         'INSERT INTO tiles (id, team, completed, completionsRequired, completionsDone) VALUES (?, ?, ?, ?, ?)',

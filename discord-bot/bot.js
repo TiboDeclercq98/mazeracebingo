@@ -46,7 +46,12 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   // Get the team name from the channel name
-  const team = interaction.channel?.name;
+  let team = interaction.channel?.name;
+  // If the channel name is not a valid team, try to get from a parent category or topic (optional, fallback)
+  if (!team || team === 'general' || team === 'bot-commands') {
+    // Optionally, you can set a default or error here
+    team = interaction.guild?.name || 'default';
+  }
 
   if (interaction.commandName === 'completetile') {
     const channelId = interaction.channelId;
@@ -82,7 +87,21 @@ client.on('interactionCreate', async interaction => {
         });
       } else {
         // JSON response (already completed or error)
-        const data = await res.json();
+        let text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (err) {
+          // If not valid JSON, show the raw text (likely HTML error page)
+          // Try to extract a backend error message from HTML
+          const match = text.match(/TypeError: ([^<]+)/);
+          if (match) {
+            await interaction.editReply({ content: `Backend error: ${match[1]}`, flags: 64 });
+          } else {
+            await interaction.editReply({ content: `Error: Unexpected response from server.\n${text.substring(0, 200)}`, flags: 64 });
+          }
+          return;
+        }
         if (data.alreadyCompleted) {
           await interaction.editReply({ content: `Tile ${id} is already completed!`, flags: 64 });
         } else if (data.error) {
@@ -153,8 +172,15 @@ client.on('interactionCreate', async interaction => {
       await interaction.deferReply();
       // Pass team as a query parameter
       const res = await fetch(`${API_BASE}/tiles?team=${encodeURIComponent(team)}`);
-      const data = await res.json();
-      await interaction.editReply('Current maze state: ' + JSON.stringify(data));
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        await interaction.editReply('Current maze state: ' + JSON.stringify(data));
+      } else {
+        // Not JSON, probably an error page
+        const text = await res.text();
+        await interaction.editReply({ content: `Error: Unexpected response from server.\n${text.substring(0, 200)}`, flags: 64 });
+      }
     } catch (e) {
       await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
     }

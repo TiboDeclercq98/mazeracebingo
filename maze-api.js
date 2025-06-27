@@ -178,7 +178,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   const isEnd = id === endId;
   let specialEvent = null;
   if (tile.completed) {
-    return res.json({ success: false, alreadyCompleted: true, tile });
+    return res.status(400).json({ success: false, alreadyCompleted: true, tile });
   }
   if (!tile.completed && !isStart) {
     const idx = id - 1;
@@ -368,21 +368,8 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
     res.send(screenshot);
   } catch (err) {
     console.error('Screenshot failed:', err);
-    const png1x1 = Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=',
-      'base64'
-    );
-    res.set('Content-Type', 'image/png');
-    if (specialEvent) {
-      if (specialEvent.type === 'boobytrap') {
-        res.set('X-Boobytrap-Message', specialEvent.message + ' (screenshot failed)');
-      } else if (specialEvent.type === 'chest') {
-        res.set('X-Chest-Message', specialEvent.message + ' (screenshot failed)');
-      }
-    } else {
-      res.set('X-Error-Message', 'Screenshot failed: ' + err.message);
-    }
-    res.send(png1x1);
+    // On screenshot error, return JSON error instead of PNG
+    return res.status(500).json({ error: 'Screenshot failed', details: err.message, specialEvent });
   }
 });
 

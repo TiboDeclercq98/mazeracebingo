@@ -99,8 +99,8 @@ client.on('interactionCreate', async interaction => {
   }
 
   if (interaction.commandName === 'createmaze') {
+    await interaction.deferReply(); // Ensure this is the very first line
     try {
-      await interaction.deferReply();
       // Pass team as a query parameter
       const saveFile = interaction.options.getAttachment('savefile');
       let res;
@@ -125,10 +125,20 @@ client.on('interactionCreate', async interaction => {
       }
       if (!res.ok) {
         let errorMsg = 'Failed to create maze';
+        let backendLog = '';
         try {
-          const data = await res.json();
-          if (data && data.error) errorMsg = data.error;
-        } catch {}
+          const text = await res.text(); // Only read once!
+          try {
+            const data = JSON.parse(text);
+            if (data && data.error) errorMsg = data.error;
+            backendLog = data;
+          } catch {
+            backendLog = text;
+          }
+        } catch (err) {
+          backendLog = err.message;
+        }
+        console.error('Backend error:', backendLog);
         await interaction.editReply({ content: `Error: ${errorMsg}`, flags: 64 });
         return;
       }

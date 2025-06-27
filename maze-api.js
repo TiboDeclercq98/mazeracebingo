@@ -153,4 +153,8 @@ function saveMazeToDb(team) {
     });
 }
 
-// (If there are more routes or exports, they should follow here)
+// Start the Express server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Maze Bingo API running on port ${PORT}`);
+});

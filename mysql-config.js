@@ -6,5 +6,5 @@ module.exports = {
   password: 'Rkam^lnBr8YsDYr@B6SMC9.r',
   database: 's429845_MazeRaceBingoStates',
   port: 3306,
-  connectionLimit: 5 // Limit pool to 5 concurrent connections
+  connectionLimit: 2 // Limit pool to 5 concurrent connections
 };

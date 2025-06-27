@@ -23,13 +23,7 @@ let boobytrapPositions = [];
 let tileDescriptions = {}; // New state for tile descriptions
 
 // MySQL configuration
-const mysqlConfig = {
-  host: 'mysql.db.bot-hosting.net',
-  user: 'u429845_rT36iNQGxe',
-  password: 'Rkam^lnBr8YsDYr@B6SMC9.r',
-  database: 's429845_MazeRaceBingoStates',
-  port: 3306
-};
+const mysqlConfig = require('./mysql-config');
 const db = mysql.createPool(mysqlConfig);
 
 // Helper for queries (returns Promise)

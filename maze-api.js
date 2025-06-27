@@ -160,7 +160,7 @@ app.get('/api/tiles', (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
   loadMazeFromDb(team, () => {
-    res.json(mazeState);
+    if (!res.headersSent) res.json(mazeState);
   });
 });
 
@@ -391,7 +391,7 @@ app.get('/api/current', (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
   loadMazeFromDb(team, () => {
-    res.json({
+    if (!res.headersSent) res.json({
       size: SIZE,
       walls: mazeWalls,
       tiles: mazeState,
@@ -406,7 +406,7 @@ app.get('/api/maze', (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
   loadMazeFromDb(team, () => {
-    res.json({
+    if (!res.headersSent) res.json({
       size: SIZE,
       walls: mazeWalls,
       tiles: mazeState,

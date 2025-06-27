@@ -2,8 +2,8 @@
 // Fill in your actual credentials
 module.exports = {
   host: 'mysql.db.bot-hosting.net',
-  user: 'YOUR_USERNAME',
-  password: 'YOUR_PASSWORD',
-  database: 'YOUR_DATABASE',
+  user: 'u429845_rT36iNQGxe',
+  password: 'Rkam^lnBr8YsDYr@B6SMC9.r',
+  database: 's429845_MazeRaceBingoStates',
   port: 3306
 };

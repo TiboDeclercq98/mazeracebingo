@@ -12,15 +12,7 @@ app.use(express.json());
 app.use(cors());
 
 const SIZE = 9; // 9x9 grid as in your app
-let mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({
-  id: i + 1,
-  completed: false,
-}));
-
-// --- Unified Maze State ---
-let mazeWalls = [];
-let boobytrapPositions = [];
-let tileDescriptions = {}; // New state for tile descriptions
+// No global maze state! All state is now per-request.
 
 // MySQL configuration
 const mysqlConfig = require('./mysql-config');
@@ -67,101 +59,80 @@ async function initDb() {
 initDb();
 
 // --- TEAM-AWARE DB HELPERS ---
-function loadMazeFromDb(team, callback) {
-  dbQuery('SELECT * FROM tiles WHERE team = ?', [team])
-    .then(tiles => {
-      if (tiles.length > 0) {
-        mazeState = tiles.map(t => ({
-          id: t.id,
-          completed: !!t.completed,
-          completionsRequired: t.completionsRequired !== undefined ? t.completionsRequired : 1,
-          completionsDone: t.completionsDone !== undefined ? t.completionsDone : 0
-        }));
-        return dbQuery('SELECT * FROM walls WHERE team = ?', [team]);
-      } else {
-        // DB is empty for this team, initialize default maze and save
-        mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({ id: i + 1, completed: false, completionsRequired: 1, completionsDone: 0 }));
-        mazeWalls = [];
-        boobytrapPositions = [];
-        tileDescriptions = {};
-        // Wait for saveMazeToDb to finish before callback
-        return saveMazeToDb(team).then(() => null);
-      }
-    })
-    .then(rows => {
-      if (!rows) return dbQuery('SELECT * FROM walls WHERE team = ?', [team]);
-      mazeWalls = rows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
-      return dbQuery('SELECT * FROM boobytraps WHERE team = ?', [team]);
-    })
-    .then(traps => {
-      boobytrapPositions = traps.map(t => ({ row: t.row, col: t.col }));
-      return dbQuery('SELECT * FROM tileDescriptions WHERE team = ?', [team]);
-    })
-    .then(descs => {
-      tileDescriptions = {};
-      descs.forEach(d => { tileDescriptions[d.tileId] = d.description; });
-      if (callback) callback();
-    })
-    .catch(err => {
-      console.error('Error loading maze from DB:', err);
-      if (callback) callback();
-    });
+async function loadMazeFromDb(team) {
+  // Returns { mazeState, mazeWalls, boobytrapPositions, tileDescriptions }
+  let mazeState, mazeWalls, boobytrapPositions, tileDescriptions;
+  const tiles = await dbQuery('SELECT * FROM tiles WHERE team = ?', [team]);
+  if (tiles.length > 0) {
+    mazeState = tiles.map(t => ({
+      id: t.id,
+      completed: !!t.completed,
+      completionsRequired: t.completionsRequired !== undefined ? t.completionsRequired : 1,
+      completionsDone: t.completionsDone !== undefined ? t.completionsDone : 0
+    }));
+  } else {
+    mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({ id: i + 1, completed: false, completionsRequired: 1, completionsDone: 0 }));
+    mazeWalls = [];
+    boobytrapPositions = [];
+    tileDescriptions = {};
+    await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+  }
+  const wallsRows = await dbQuery('SELECT * FROM walls WHERE team = ?', [team]);
+  mazeWalls = wallsRows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
+  const traps = await dbQuery('SELECT * FROM boobytraps WHERE team = ?', [team]);
+  boobytrapPositions = traps.map(t => ({ row: t.row, col: t.col }));
+  const descs = await dbQuery('SELECT * FROM tileDescriptions WHERE team = ?', [team]);
+  tileDescriptions = {};
+  descs.forEach(d => { tileDescriptions[d.tileId] = d.description; });
+  return { mazeState, mazeWalls, boobytrapPositions, tileDescriptions };
 }
 
-function saveMazeToDb(team) {
-  return dbQuery('DELETE FROM tiles WHERE team = ?', [team])
-    .then(() => {
-      const tileInserts = mazeState.map(t => dbQuery(
-        'INSERT INTO tiles (id, team, completed, completionsRequired, completionsDone) VALUES (?, ?, ?, ?, ?)',
-        [t.id, team, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0]
-      ));
-      return Promise.all(tileInserts);
-    })
-    .then(() => dbQuery('DELETE FROM walls WHERE team = ?', [team]))
-    .then(() => {
-      const wallInserts = mazeWalls.map(w => dbQuery(
-        'INSERT INTO walls (row, col, team, walls) VALUES (?, ?, ?, ?)',
-        [w.row, w.col, team, JSON.stringify(w.walls)]
-      ));
-      return Promise.all(wallInserts);
-    })
-    .then(() => dbQuery('DELETE FROM boobytraps WHERE team = ?', [team]))
-    .then(() => {
-      const trapInserts = boobytrapPositions.map(b => dbQuery(
-        'INSERT INTO boobytraps (row, col, team) VALUES (?, ?, ?)',
-        [b.row, b.col, team]
-      ));
-      return Promise.all(trapInserts);
-    })
-    .then(() => dbQuery('DELETE FROM tileDescriptions WHERE team = ?', [team]))
-    .then(() => {
-      const descInserts = Object.entries(tileDescriptions).map(([tileId, description]) => dbQuery(
-        'INSERT INTO tileDescriptions (tileId, team, description) VALUES (?, ?, ?)',
-        [tileId, team, description]
-      ));
-      return Promise.all(descInserts);
-    })
-    .catch(err => {
-      console.error('Error saving maze to DB:', err);
-    });
+async function saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions) {
+  try {
+    await dbQuery('DELETE FROM tiles WHERE team = ?', [team]);
+    const tileInserts = mazeState.map(t => dbQuery(
+      'INSERT INTO tiles (id, team, completed, completionsRequired, completionsDone) VALUES (?, ?, ?, ?, ?)',
+      [t.id, team, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0]
+    ));
+    await Promise.all(tileInserts);
+    await dbQuery('DELETE FROM walls WHERE team = ?', [team]);
+    const wallInserts = mazeWalls.map(w => dbQuery(
+      'INSERT INTO walls (row, col, team, walls) VALUES (?, ?, ?, ?)',
+      [w.row, w.col, team, JSON.stringify(w.walls)]
+    ));
+    await Promise.all(wallInserts);
+    await dbQuery('DELETE FROM boobytraps WHERE team = ?', [team]);
+    const trapInserts = boobytrapPositions.map(b => dbQuery(
+      'INSERT INTO boobytraps (row, col, team) VALUES (?, ?, ?)',
+      [b.row, b.col, team]
+    ));
+    await Promise.all(trapInserts);
+    await dbQuery('DELETE FROM tileDescriptions WHERE team = ?', [team]);
+    const descInserts = Object.entries(tileDescriptions).map(([tileId, description]) => dbQuery(
+      'INSERT INTO tileDescriptions (tileId, team, description) VALUES (?, ?, ?)',
+      [tileId, team, description]
+    ));
+    await Promise.all(descInserts);
+  } catch (err) {
+    console.error('Error saving maze to DB:', err);
+  }
 }
 
 // --- EXPRESS ROUTES ---
 
 // Fetch all tiles
-app.get('/api/tiles', (req, res) => {
+app.get('/api/tiles', async (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
-  loadMazeFromDb(team, () => {
-    if (!res.headersSent) res.json(mazeState);
-  });
+  const { mazeState } = await loadMazeFromDb(team);
+  if (!res.headersSent) res.json(mazeState);
 });
 
 // Complete a tile
 app.post('/api/tiles/complete/:id', async (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
-  await new Promise(resolve => loadMazeFromDb(team, resolve));
+  let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions } = await loadMazeFromDb(team);
   const id = parseInt(req.params.id, 10);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
@@ -252,7 +223,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
         if (candidates.length > 0) {
           const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
           mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
-          saveMazeToDb(team);
+          await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
           specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion` };
         }
       }
@@ -306,10 +277,10 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
               mazeState[pickIdx].completionsRequired = 0;
               mazeState[pickIdx].completed = true;
               mazeState[pickIdx].completionsDone = 0;
-              saveMazeToDb(team);
+              await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
               specialEvent = { type: 'chest', message: `You found a chest, tile ${mazeState[pickIdx].id} has been completed` };
             } else {
-              saveMazeToDb(team);
+              await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
               specialEvent = { type: 'chest', message: `You found a chest! Tile ${mazeState[pickIdx].id} needs one less completion` };
             }
           }
@@ -317,7 +288,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
       }
     }
   }
-  saveMazeToDb(team);
+  await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
   const idx = id - 1;
   const row = Math.floor(idx / SIZE);
   const col = idx % SIZE;
@@ -369,37 +340,35 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
 });
 
 // Real browser screenshot endpoint
-app.get('/api/current', (req, res) => {
+app.get('/api/current', async (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
-  loadMazeFromDb(team, () => {
-    if (!res.headersSent) res.json({
-      size: SIZE,
-      walls: mazeWalls,
-      tiles: mazeState,
-      boobytraps: boobytrapPositions,
-      tileDescriptions
-    });
+  const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions } = await loadMazeFromDb(team);
+  if (!res.headersSent) res.json({
+    size: SIZE,
+    walls: mazeWalls,
+    tiles: mazeState,
+    boobytraps: boobytrapPositions,
+    tileDescriptions
   });
 });
 
 // New endpoint: fetch full maze state
-app.get('/api/maze', (req, res) => {
+app.get('/api/maze', async (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
-  loadMazeFromDb(team, () => {
-    if (!res.headersSent) res.json({
-      size: SIZE,
-      walls: mazeWalls,
-      tiles: mazeState,
-      boobytraps: boobytrapPositions,
-      tileDescriptions
-    });
+  const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions } = await loadMazeFromDb(team);
+  if (!res.headersSent) res.json({
+    size: SIZE,
+    walls: mazeWalls,
+    tiles: mazeState,
+    boobytraps: boobytrapPositions,
+    tileDescriptions
   });
 });
 
 // Create a new maze from save file content
-app.post('/api/create', (req, res) => {
+app.post('/api/create', async (req, res) => {
   const team = req.query.team;
   if (!team) return res.status(400).json({ error: 'Missing team' });
   const { saveData } = req.body;
@@ -408,17 +377,17 @@ app.post('/api/create', (req, res) => {
   try {
     loaded = typeof saveData === 'string' ? JSON.parse(saveData) : saveData;
     if (loaded && Array.isArray(loaded.mazeWalls)) {
-      mazeWalls = loaded.mazeWalls;
+      const mazeWalls = loaded.mazeWalls;
       const mazeSize = loaded.size || SIZE;
-      mazeState = Array(mazeSize * mazeSize).fill().map((_, i) => ({
+      const mazeState = Array(mazeSize * mazeSize).fill().map((_, i) => ({
         id: i + 1,
         completed: false,
         completionsRequired: 1,
         completionsDone: 0
       }));
-      boobytrapPositions = loaded.boobytraps || [];
-      tileDescriptions = loaded.tileDescriptions || {};
-      saveMazeToDb(team);
+      const boobytrapPositions = loaded.boobytraps || [];
+      const tileDescriptions = loaded.tileDescriptions || {};
+      await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
       res.json({ success: true });
     } else {
       return res.status(400).json({ error: 'Invalid save file format' });
@@ -440,9 +409,10 @@ app.get('/api/tasks', (req, res) => {
 });
 
 // Uncomplete a tile if only one adjacent completed tile
-app.post('/api/tiles/uncomplete/:id', (req, res) => {
+app.post('/api/tiles/uncomplete/:id', async (req, res) => {
   const team = req.query.team;
   const id = parseInt(req.params.id, 10);
+  let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions } = await loadMazeFromDb(team);
   const tile = mazeState.find(t => t.id === id);
   if (!tile) return res.status(404).json({ error: 'Tile not found' });
   if (!tile.completed) return res.status(400).json({ error: 'Tile is not completed' });
@@ -468,7 +438,7 @@ app.post('/api/tiles/uncomplete/:id', (req, res) => {
   if (tile.completionsDone < (tile.completionsRequired || 1)) {
     tile.completed = false;
   }
-  saveMazeToDb(team);
+  await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
   res.json({ success: true, tile });
 });
 

@@ -140,6 +140,13 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
   const endId = Math.floor(SIZE / 2) + 1;
   const isStart = id === startId;
   const isEnd = id === endId;
+
+  // If the end tile is completed, the game is finished: no more completions allowed
+  const endTile = mazeState.find(t => t.id === endId);
+  if (endTile && endTile.completed && !isEnd) {
+    return res.status(403).json({ error: 'Game is finished. No more tiles can be completed.' });
+  }
+
   let specialEvent = null;
   if (tile.completed) {
     return res.status(400).json({ success: false, alreadyCompleted: true, tile });
@@ -179,109 +186,116 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
     tile.completionsDone = (tile.completionsDone || 0) + 1;
     if (tile.completionsDone >= (tile.completionsRequired || 1)) {
       tile.completed = true;
-      const idx = id - 1;
-      const row = Math.floor(idx / SIZE);
-      const col = idx % SIZE;
-      const isBoobytrap = boobytrapPositions.some(b => b.row === row && b.col === col);
-      if (isBoobytrap) {
-        function getWallObj(r, c) {
-          return mazeWalls.find(w => w.row === r && w.col === c);
-        }
-        const revealed = new Set();
-        mazeState.forEach((t, i) => {
-          if (t.completed) {
-            revealed.add(i);
-            const row = Math.floor(i / SIZE);
-            const col = i % SIZE;
-            const wallObj = getWallObj(row, col);
-            if (row > 0) {
-              const nIdx = (row - 1) * SIZE + col;
-              const nWallObj = getWallObj(row - 1, col);
-              if ((!wallObj || !wallObj.walls.top) && (!nWallObj || !nWallObj.walls.bottom)) revealed.add(nIdx);
-            }
-            if (row < SIZE - 1) {
-              const nIdx = (row + 1) * SIZE + col;
-              const nWallObj = getWallObj(row + 1, col);
-              if ((!wallObj || !wallObj.walls.bottom) && (!nWallObj || !nWallObj.walls.top)) revealed.add(nIdx);
-            }
-            if (col > 0) {
-              const nIdx = row * SIZE + (col - 1);
-              const nWallObj = getWallObj(row, col - 1);
-              if ((!wallObj || !wallObj.walls.left) && (!nWallObj || !nWallObj.walls.right)) revealed.add(nIdx);
-            }
-            if (col < SIZE - 1) {
-              const nIdx = row * SIZE + (col + 1);
-              const nWallObj = getWallObj(row, col + 1);
-              if ((!wallObj || !wallObj.walls.right) && (!nWallObj || !nWallObj.walls.left)) revealed.add(nIdx);
-            }
-          }
-        });
-        const candidates = Array.from(revealed).filter(i => {
-          const t = mazeState[i];
-          return !t.completed && t.id !== startId && t.id !== endId;
-        });
-        if (candidates.length > 0) {
-          const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
-          mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
-          await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
-          specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion` };
-        }
-      }
-      const deadendIdx = id - 1;
-      const deadendRow = Math.floor(deadendIdx / SIZE);
-      const deadendCol = deadendIdx % SIZE;
-      const wallObj = mazeWalls.find(w => w.row === deadendRow && w.col === deadendCol);
-      if (wallObj && id !== startId && id !== endId) {
-        const wallCount = ['top', 'right', 'bottom', 'left'].reduce((count, dir) => count + (wallObj.walls[dir] ? 1 : 0), 0);
-        if (wallCount === 3) {
-          function getWallObj2(r, c) {
+      if (isEnd) {
+        // Reveal the entire maze (set revealed: true for all tiles, but do not mark as completed)
+        mazeState.forEach(t => { t.revealed = true; });
+        await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+        specialEvent = { type: 'gameover', message: 'The end tile was completed! The entire maze is now revealed. Game over.' };
+      } else {
+        const idx = id - 1;
+        const row = Math.floor(idx / SIZE);
+        const col = idx % SIZE;
+        const isBoobytrap = boobytrapPositions.some(b => b.row === row && b.col === col);
+        if (isBoobytrap) {
+          function getWallObj(r, c) {
             return mazeWalls.find(w => w.row === r && w.col === c);
           }
           const revealed = new Set();
           mazeState.forEach((t, i) => {
             if (t.completed) {
               revealed.add(i);
-              const row2 = Math.floor(i / SIZE);
-              const col2 = i % SIZE;
-              const wallObj2 = getWallObj2(row2, col2);
-              if (row2 > 0) {
-                const nIdx = (row2 - 1) * SIZE + col2;
-                const nWallObj = getWallObj2(row2 - 1, col2);
-                if ((!wallObj2 || !wallObj2.walls.top) && (!nWallObj || !nWallObj.walls.bottom)) revealed.add(nIdx);
+              const row = Math.floor(i / SIZE);
+              const col = i % SIZE;
+              const wallObj = getWallObj(row, col);
+              if (row > 0) {
+                const nIdx = (row - 1) * SIZE + col;
+                const nWallObj = getWallObj(row - 1, col);
+                if ((!wallObj || !wallObj.walls.top) && (!nWallObj || !nWallObj.walls.bottom)) revealed.add(nIdx);
               }
-              if (row2 < SIZE - 1) {
-                const nIdx = (row2 + 1) * SIZE + col2;
-                const nWallObj = getWallObj2(row2 + 1, col2);
-                if ((!wallObj2 || !wallObj2.walls.bottom) && (!nWallObj || !nWallObj.walls.top)) revealed.add(nIdx);
+              if (row < SIZE - 1) {
+                const nIdx = (row + 1) * SIZE + col;
+                const nWallObj = getWallObj(row + 1, col);
+                if ((!wallObj || !wallObj.walls.bottom) && (!nWallObj || !nWallObj.walls.top)) revealed.add(nIdx);
               }
-              if (col2 > 0) {
-                const nIdx = row2 * SIZE + (col2 - 1);
-                const nWallObj = getWallObj2(row2, col2 - 1);
-                if ((!wallObj2 || !wallObj2.walls.left) && (!nWallObj || !nWallObj.walls.right)) revealed.add(nIdx);
+              if (col > 0) {
+                const nIdx = row * SIZE + (col - 1);
+                const nWallObj = getWallObj(row, col - 1);
+                if ((!wallObj || !wallObj.walls.left) && (!nWallObj || !nWallObj.walls.right)) revealed.add(nIdx);
               }
-              if (col2 < SIZE - 1) {
-                const nIdx = row2 * SIZE + (col2 + 1);
-                const nWallObj = getWallObj2(row2, col2 + 1);
-                if ((!wallObj2 || !wallObj2.walls.right) && (!nWallObj || !nWallObj.walls.left)) revealed.add(nIdx);
+              if (col < SIZE - 1) {
+                const nIdx = row * SIZE + (col + 1);
+                const nWallObj = getWallObj(row, col + 1);
+                if ((!wallObj || !wallObj.walls.right) && (!nWallObj || !nWallObj.walls.left)) revealed.add(nIdx);
               }
             }
           });
           const candidates = Array.from(revealed).filter(i => {
             const t = mazeState[i];
-            return !t.completed && t.id !== startId && t.id !== endId && (t.completionsRequired || 1) > 0;
+            return !t.completed && t.id !== startId && t.id !== endId;
           });
           if (candidates.length > 0) {
             const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
-            mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) - 1;
-            if (mazeState[pickIdx].completionsRequired <= 0) {
-              mazeState[pickIdx].completionsRequired = 0;
-              mazeState[pickIdx].completed = true;
-              mazeState[pickIdx].completionsDone = 0;
-              await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
-              specialEvent = { type: 'chest', message: `You found a chest, tile ${mazeState[pickIdx].id} has been completed` };
-            } else {
-              await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
-              specialEvent = { type: 'chest', message: `You found a chest! Tile ${mazeState[pickIdx].id} needs one less completion` };
+            mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
+            await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+            specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion` };
+          }
+        }
+        const deadendIdx = id - 1;
+        const deadendRow = Math.floor(deadendIdx / SIZE);
+        const deadendCol = deadendIdx % SIZE;
+        const wallObj = mazeWalls.find(w => w.row === deadendRow && w.col === deadendCol);
+        if (wallObj && id !== startId && id !== endId) {
+          const wallCount = ['top', 'right', 'bottom', 'left'].reduce((count, dir) => count + (wallObj.walls[dir] ? 1 : 0), 0);
+          if (wallCount === 3) {
+            function getWallObj2(r, c) {
+              return mazeWalls.find(w => w.row === r && w.col === c);
+            }
+            const revealed = new Set();
+            mazeState.forEach((t, i) => {
+              if (t.completed) {
+                revealed.add(i);
+                const row2 = Math.floor(i / SIZE);
+                const col2 = i % SIZE;
+                const wallObj2 = getWallObj2(row2, col2);
+                if (row2 > 0) {
+                  const nIdx = (row2 - 1) * SIZE + col2;
+                  const nWallObj = getWallObj2(row2 - 1, col2);
+                  if ((!wallObj2 || !wallObj2.walls.top) && (!nWallObj || !nWallObj.walls.bottom)) revealed.add(nIdx);
+                }
+                if (row2 < SIZE - 1) {
+                  const nIdx = (row2 + 1) * SIZE + col2;
+                  const nWallObj = getWallObj2(row2 + 1, col2);
+                  if ((!wallObj2 || !wallObj2.walls.bottom) && (!nWallObj || !nWallObj.walls.top)) revealed.add(nIdx);
+                }
+                if (col2 > 0) {
+                  const nIdx = row2 * SIZE + (col2 - 1);
+                  const nWallObj = getWallObj2(row2, col2 - 1);
+                  if ((!wallObj2 || !wallObj2.walls.left) && (!nWallObj || !nWallObj.walls.right)) revealed.add(nIdx);
+                }
+                if (col2 < SIZE - 1) {
+                  const nIdx = row2 * SIZE + (col2 + 1);
+                  const nWallObj = getWallObj2(row2, col2 + 1);
+                  if ((!wallObj2 || !wallObj2.walls.right) && (!nWallObj || !nWallObj.walls.left)) revealed.add(nIdx);
+                }
+              }
+            });
+            const candidates = Array.from(revealed).filter(i => {
+              const t = mazeState[i];
+              return !t.completed && t.id !== startId && t.id !== endId && (t.completionsRequired || 1) > 0;
+            });
+            if (candidates.length > 0) {
+              const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
+              mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) - 1;
+              if (mazeState[pickIdx].completionsRequired <= 0) {
+                mazeState[pickIdx].completionsRequired = 0;
+                mazeState[pickIdx].completed = true;
+                mazeState[pickIdx].completionsDone = 0;
+                await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+                specialEvent = { type: 'chest', message: `You found a chest, tile ${mazeState[pickIdx].id} has been completed` };
+              } else {
+                await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+                specialEvent = { type: 'chest', message: `You found a chest! Tile ${mazeState[pickIdx].id} needs one less completion` };
+              }
             }
           }
         }
@@ -327,6 +341,8 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
         res.set('X-Boobytrap-Message', specialEvent.message);
       } else if (specialEvent.type === 'chest') {
         res.set('X-Chest-Message', specialEvent.message);
+      } else if (specialEvent.type === 'gameover') {
+        res.set('X-Gameover-Message', specialEvent.message);
       }
     }
     res.send(screenshot);

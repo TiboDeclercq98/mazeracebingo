@@ -10,7 +10,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('completetile')
     .setDescription('Complete a tile by ID')
-    .addIntegerOption(option => option.setName('id').setDescription('Tile ID').setRequired(true)),
+    .addStringOption(option => option.setName('id').setDescription('Tile ID (number, start, or end)').setRequired(true)),
   new SlashCommandBuilder()
     .setName('createmaze')
     .setDescription('Create a new maze')
@@ -62,7 +62,19 @@ client.on('interactionCreate', async interaction => {
     completionInProgress.add(channelId);
     try {
       await interaction.deferReply(); // Acknowledge immediately to avoid timeout
-      const id = interaction.options.getInteger('id');
+      let idRaw = interaction.options.getString('id');
+      let id;
+      if (typeof idRaw === 'string') {
+        if (idRaw.toLowerCase() === 'start') id = 77;
+        else if (idRaw.toLowerCase() === 'end') id = 5;
+        else id = parseInt(idRaw, 10);
+      } else {
+        id = idRaw;
+      }
+      if (!id || isNaN(id)) {
+        await interaction.editReply({ content: 'Invalid tile ID. Use a number, "start", or "end".', flags: 64 });
+        return;
+      }
       // Pass team as a query parameter
       const res = await fetch(`${API_BASE}/tiles/complete/${id}?team=${encodeURIComponent(team)}`, { method: 'POST' });
       const contentType = res.headers.get('content-type');

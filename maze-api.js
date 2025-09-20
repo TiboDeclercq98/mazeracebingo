@@ -182,6 +182,7 @@ app.post('/api/tiles/complete/:id', async (req, res) => {
       return res.status(403).json({ error: 'Tile is not revealed (blocked by wall or no adjacent completed tile)' });
     }
   }
+  
   if (!tile.completed) {
     tile.completionsDone = (tile.completionsDone || 0) + 1;
     if (tile.completionsDone >= (tile.completionsRequired || 1)) {

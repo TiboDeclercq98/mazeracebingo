@@ -81,8 +81,8 @@ client.on('interactionCreate', async interaction => {
       } else {
         id = idRaw;
       }
-      if (!id || isNaN(id)) {
-        await interaction.editReply({ content: 'Invalid tile ID. Use a number, "start", or "end".', flags: 64 });
+      if (!id || isNaN(id) || id < 1 || id > 81) {
+        await interaction.editReply({ content: 'Invalid tile ID. Use a number between 1 and 81, "start", or "end".', flags: 64 });
         return;
       }
       // Pass team as a query parameter
@@ -146,6 +146,10 @@ client.on('interactionCreate', async interaction => {
       const saveFile = interaction.options.getAttachment('savefile');
       let res;
       if (saveFile) {
+        if (saveFile.size > 500_000) {
+          await interaction.editReply({ content: 'Save file too large (max 500 KB).', flags: 64 });
+          return;
+        }
         // Download the file and send its content as saveData
         const fileRes = await fetch(saveFile.url);
         const saveText = await fileRes.text();
@@ -201,6 +205,10 @@ client.on('interactionCreate', async interaction => {
       const tileId     = interaction.options.getInteger('tile');
       const playerName = interaction.options.getString('player');
       const amount     = interaction.options.getInteger('amount') || 1;
+      if (tileId < 1 || tileId > 81) {
+        await interaction.editReply({ content: 'Invalid tile ID. Must be between 1 and 81.', flags: 64 });
+        return;
+      }
       if (amount < 1) {
         await interaction.editReply({ content: 'Amount must be at least 1.', flags: 64 });
         return;

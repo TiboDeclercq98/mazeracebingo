@@ -1,17 +1,19 @@
-# Use the official Playwright image with all dependencies
+# Use the official Playwright image — version must match the playwright npm package below.
 FROM mcr.microsoft.com/playwright:v1.53.1-jammy
 
 WORKDIR /app
 
-# Copy package files and install dependencies first for better caching
 COPY package.json package-lock.json* ./
 RUN npm install
 
-# Copy the rest of the app
 COPY . .
 
-# Expose the port your app runs on (default 3000)
 EXPOSE 3000
 
-# Start the server
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+USER appuser
+
 CMD ["node", "maze-api.js"]

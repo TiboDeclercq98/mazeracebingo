@@ -4,7 +4,7 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "mysql2": "^3.14.1",
-    "playwright": "^1.44.0",
+    "playwright": "1.53.1",
     "sqlite3": "^5.1.7"
   },
   "scripts": {}

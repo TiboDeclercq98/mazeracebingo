@@ -9,7 +9,19 @@ const mysql = require('mysql2');
 const { chromium } = require('playwright');
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// CORS: restrict to origins listed in ALLOWED_ORIGINS (comma-separated).
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [];
+app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false }));
+
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () =>
+    console.log(`${req.method} ${req.path} team=${req.query.team || '-'} → ${res.statusCode} (${Date.now() - start}ms)`)
+  );
+  next();
+});
 
 const SIZE = 9; // 9x9 grid
 // No global maze state — all state is per-request.
@@ -134,22 +146,40 @@ function isTileRevealed(id, mazeState, mazeWalls) {
   });
 }
 
-// Launches a Playwright browser, renders the frontend maze for `team`, and returns a PNG buffer.
+// --- PLAYWRIGHT BROWSER POOLING ---
+// One persistent browser is kept alive across requests; a new page is created per screenshot.
+let _browser = null;
+
+async function getBrowser() {
+  if (!_browser || !_browser.isConnected()) {
+    _browser = await chromium.launch({ args: ['--no-sandbox'] });
+  }
+  return _browser;
+}
+
 async function takeScreenshot(team) {
-  const url = (process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/') + `?team=${encodeURIComponent(team)}`;
-  const browser = await chromium.launch({ args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  const url     = (process.env.FRONTEND_URL || 'https://mazeracebingo-1.onrender.com/') + `?team=${encodeURIComponent(team)}`;
+  const browser = await getBrowser();
+  const page    = await browser.newPage();
   try {
-    await page.goto(url, { waitUntil: 'networkidle' });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
     await page.evaluate(() => {
-      const panel = document.querySelector('.button-panel');
-      if (panel) panel.classList.add('hide-for-screenshot');
+      const p = document.querySelector('.button-panel');
+      if (p) p.classList.add('hide-for-screenshot');
     });
     return await page.screenshot({ fullPage: true });
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
+
+// Close the browser cleanly on shutdown so container stops gracefully.
+async function shutdown() {
+  if (_browser) await _browser.close().catch(() => {});
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT',  shutdown);
 
 // --- TEAM-AWARE DB HELPERS ---
 
@@ -184,45 +214,55 @@ async function loadMazeFromDb(team) {
   return { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions };
 }
 
+// All writes are wrapped in a single transaction; uses batch INSERTs to minimise round-trips.
 async function saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions) {
+  const conn = await new Promise((res, rej) => db.getConnection((err, c) => err ? rej(err) : res(c)));
+  const txQuery = (sql, params) => new Promise((res, rej) => conn.query(sql, params, (e, r) => e ? rej(e) : res(r)));
   try {
-    await dbQuery('DELETE FROM tiles WHERE team = ?', [team]);
-    const tileInserts = mazeState.map(t => dbQuery(
-      'INSERT INTO tiles (id, team, completed, completionsRequired, completionsDone) VALUES (?, ?, ?, ?, ?)',
-      [t.id, team, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0]
-    ));
-    await Promise.all(tileInserts);
-    await dbQuery('DELETE FROM walls WHERE team = ?', [team]);
-    const wallInserts = mazeWalls.map(w => dbQuery(
-      'INSERT INTO walls (row, col, team, walls) VALUES (?, ?, ?, ?)',
-      [w.row, w.col, team, JSON.stringify(w.walls)]
-    ));
-    await Promise.all(wallInserts);
-    await dbQuery('DELETE FROM boobytraps WHERE team = ?', [team]);
-    const trapInserts = boobytrapPositions.map(b => dbQuery(
-      'INSERT INTO boobytraps (row, col, team) VALUES (?, ?, ?)',
-      [b.row, b.col, team]
-    ));
-    await Promise.all(trapInserts);
-    await dbQuery('DELETE FROM tileDescriptions WHERE team = ?', [team]);
-    const descInserts = Object.entries(tileDescriptions).map(([tileId, description]) => dbQuery(
-      'INSERT INTO tileDescriptions (tileId, team, description) VALUES (?, ?, ?)',
-      [tileId, team, description]
-    ));
-    await Promise.all(descInserts);
+    await txQuery('START TRANSACTION');
+
+    await txQuery('DELETE FROM tiles WHERE team = ?', [team]);
+    if (mazeState.length > 0) {
+      const vals = mazeState.map(t => [t.id, team, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0]);
+      await txQuery('INSERT INTO tiles (id, team, completed, completionsRequired, completionsDone) VALUES ?', [vals]);
+    }
+
+    await txQuery('DELETE FROM walls WHERE team = ?', [team]);
+    if (mazeWalls.length > 0) {
+      const vals = mazeWalls.map(w => [w.row, w.col, team, JSON.stringify(w.walls)]);
+      await txQuery('INSERT INTO walls (row, col, team, walls) VALUES ?', [vals]);
+    }
+
+    await txQuery('DELETE FROM boobytraps WHERE team = ?', [team]);
+    if (boobytrapPositions.length > 0) {
+      const vals = boobytrapPositions.map(b => [b.row, b.col, team]);
+      await txQuery('INSERT INTO boobytraps (row, col, team) VALUES ?', [vals]);
+    }
+
+    await txQuery('DELETE FROM tileDescriptions WHERE team = ?', [team]);
+    const descEntries = Object.entries(tileDescriptions);
+    if (descEntries.length > 0) {
+      const vals = descEntries.map(([tileId, description]) => [tileId, team, description]);
+      await txQuery('INSERT INTO tileDescriptions (tileId, team, description) VALUES ?', [vals]);
+    }
+
+    await txQuery('COMMIT');
   } catch (err) {
-    console.error('Error saving maze to DB:', err);
+    await txQuery('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    conn.release();
   }
 }
 
 // Replaces all taskDefinitions for a team. Called only from POST /api/create.
 async function saveTaskDefinitions(team, taskDefinitions) {
   await dbQuery('DELETE FROM taskDefinitions WHERE team = ?', [team]);
-  const inserts = Object.entries(taskDefinitions).map(([tileId, def]) => dbQuery(
-    'INSERT INTO taskDefinitions (tileId, team, taskType, taskConfig) VALUES (?, ?, ?, ?)',
-    [tileId, team, def.taskType, JSON.stringify(def.taskConfig)]
-  ));
-  await Promise.all(inserts);
+  const entries = Object.entries(taskDefinitions);
+  if (entries.length > 0) {
+    const vals = entries.map(([tileId, def]) => [tileId, team, def.taskType, JSON.stringify(def.taskConfig)]);
+    await dbQuery('INSERT INTO taskDefinitions (tileId, team, taskType, taskConfig) VALUES ?', [vals]);
+  }
 }
 
 // --- CORE GAME LOGIC ---
@@ -331,172 +371,196 @@ async function submitTileProgress(team, id, playerName, amount) {
 
 // --- EXPRESS ROUTES ---
 
-app.get('/api/tiles', async (req, res) => {
-  const team = req.query.team;
-  if (!team) return res.status(400).json({ error: 'Missing team' });
-  const { mazeState } = await loadMazeFromDb(team);
-  if (!res.headersSent) res.json(mazeState);
+// Health check — verifies DB connectivity.
+app.get('/health', async (req, res) => {
+  try {
+    await dbQuery('SELECT 1');
+    res.json({ status: 'ok' });
+  } catch (err) {
+    res.status(503).json({ status: 'down', error: err.message });
+  }
+});
+
+app.get('/api/tiles', async (req, res, next) => {
+  try {
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const { mazeState } = await loadMazeFromDb(team);
+    res.json(mazeState);
+  } catch (err) { next(err); }
 });
 
 // Complete a tile — backward-compatible endpoint used by the Discord bot.
 // Submits progress of 1 as "Discord" and returns a Playwright PNG screenshot.
-app.post('/api/tiles/complete/:id', async (req, res) => {
-  const team = req.query.team;
-  if (!team) return res.status(400).json({ error: 'Missing team' });
-  const id = parseInt(req.params.id, 10);
-  const result = await submitTileProgress(team, id, 'Discord', 1);
-  if (result.error)          return res.status(result.status).json({ error: result.error });
-  if (result.alreadyCompleted) return res.status(400).json({ success: false, alreadyCompleted: true, tile: result.tile });
-  const { specialEvent } = result;
+app.post('/api/tiles/complete/:id', async (req, res, next) => {
   try {
-    const screenshot = await takeScreenshot(team);
-    res.set('Content-Type', 'image/png');
-    if (specialEvent) {
-      if (specialEvent.type === 'boobytrap') res.set('X-Boobytrap-Message', specialEvent.message);
-      else if (specialEvent.type === 'chest') res.set('X-Chest-Message', specialEvent.message);
-      else if (specialEvent.type === 'gameover') res.set('X-Gameover-Message', specialEvent.message);
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const id = parseInt(req.params.id, 10);
+    const result = await submitTileProgress(team, id, 'Discord', 1);
+    if (result.error)            return res.status(result.status).json({ error: result.error });
+    if (result.alreadyCompleted) return res.status(400).json({ success: false, alreadyCompleted: true, tile: result.tile });
+    const { specialEvent } = result;
+    try {
+      const screenshot = await takeScreenshot(team);
+      res.set('Content-Type', 'image/png');
+      if (specialEvent) {
+        if (specialEvent.type === 'boobytrap') res.set('X-Boobytrap-Message', specialEvent.message);
+        else if (specialEvent.type === 'chest') res.set('X-Chest-Message', specialEvent.message);
+        else if (specialEvent.type === 'gameover') res.set('X-Gameover-Message', specialEvent.message);
+      }
+      res.send(screenshot);
+    } catch (screenshotErr) {
+      console.error('Screenshot failed:', screenshotErr);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Screenshot failed', details: screenshotErr.message, specialEvent });
+      }
     }
-    res.send(screenshot);
-  } catch (err) {
-    console.error('Screenshot failed:', err);
-    if (!res.headersSent) {
-      res.status(500).type('application/json').json({ error: 'Screenshot failed', details: err.message, specialEvent });
-    }
-  }
+  } catch (err) { next(err); }
 });
 
 // Submit incremental progress — primary endpoint for the RuneLite plugin.
 // Body: { playerName: string, amount?: number (default 1) }
 // Returns JSON: { progress, target, completed, specialEvent, tile }
-app.post('/api/tiles/progress/:id', async (req, res) => {
-  const team = req.query.team;
-  if (!team) return res.status(400).json({ error: 'Missing team' });
-  const id = parseInt(req.params.id, 10);
-  const playerName = req.body.playerName || 'unknown';
-  const amount = Math.max(1, parseInt(req.body.amount, 10) || 1);
-  const result = await submitTileProgress(team, id, playerName, amount);
-  if (result.error)            return res.status(result.status).json({ error: result.error });
-  if (result.alreadyCompleted) return res.status(400).json({ success: false, alreadyCompleted: true, tile: result.tile });
-  res.json({
-    success: true,
-    progress: result.progress,
-    target: result.target,
-    completed: result.completed,
-    specialEvent: result.specialEvent || null,
-    tile: result.tile
-  });
+app.post('/api/tiles/progress/:id', async (req, res, next) => {
+  try {
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const id         = parseInt(req.params.id, 10);
+    const playerName = req.body.playerName || 'unknown';
+    const amount     = Math.max(1, parseInt(req.body.amount, 10) || 1);
+    const result = await submitTileProgress(team, id, playerName, amount);
+    if (result.error)            return res.status(result.status).json({ error: result.error });
+    if (result.alreadyCompleted) return res.status(400).json({ success: false, alreadyCompleted: true, tile: result.tile });
+    res.json({
+      success: true,
+      progress: result.progress,
+      target: result.target,
+      completed: result.completed,
+      specialEvent: result.specialEvent || null,
+      tile: result.tile
+    });
+  } catch (err) { next(err); }
 });
 
 // Get the per-player contribution breakdown for a tile.
-app.get('/api/tiles/progress/:id', async (req, res) => {
-  const team = req.query.team;
-  if (!team) return res.status(400).json({ error: 'Missing team' });
-  const id = parseInt(req.params.id, 10);
-  const { mazeState } = await loadMazeFromDb(team);
-  const tile = mazeState.find(t => t.id === id);
-  if (!tile) return res.status(404).json({ error: 'Tile not found' });
-  const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE tileId = ? AND team = ?', [id, team]);
-  const taskDef  = taskDefs[0] || null;
-  const rows = await dbQuery(
-    `SELECT playerName, SUM(amount) AS total, MAX(submittedAt) AS lastSubmitted
-     FROM tile_progress WHERE tileId = ? AND team = ?
-     GROUP BY playerName ORDER BY total DESC`,
-    [id, team]
-  );
-  res.json({
-    tileId: id,
-    taskType: taskDef ? taskDef.taskType : null,
-    taskConfig: taskDef ? JSON.parse(taskDef.taskConfig) : null,
-    currentProgress: tile.completionsDone || 0,
-    target: tile.completionsRequired || 1,
-    contributions: rows.map(r => ({ playerName: r.playerName, amount: r.total, lastSubmitted: r.lastSubmitted }))
-  });
+app.get('/api/tiles/progress/:id', async (req, res, next) => {
+  try {
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const id = parseInt(req.params.id, 10);
+    const { mazeState } = await loadMazeFromDb(team);
+    const tile = mazeState.find(t => t.id === id);
+    if (!tile) return res.status(404).json({ error: 'Tile not found' });
+    const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE tileId = ? AND team = ?', [id, team]);
+    const taskDef  = taskDefs[0] || null;
+    const rows = await dbQuery(
+      `SELECT playerName, SUM(amount) AS total, MAX(submittedAt) AS lastSubmitted
+       FROM tile_progress WHERE tileId = ? AND team = ?
+       GROUP BY playerName ORDER BY total DESC`,
+      [id, team]
+    );
+    res.json({
+      tileId: id,
+      taskType:        taskDef ? taskDef.taskType             : null,
+      taskConfig:      taskDef ? JSON.parse(taskDef.taskConfig) : null,
+      currentProgress: tile.completionsDone || 0,
+      target:          tile.completionsRequired || 1,
+      contributions:   rows.map(r => ({ playerName: r.playerName, amount: r.total, lastSubmitted: r.lastSubmitted }))
+    });
+  } catch (err) { next(err); }
 });
 
-app.get('/api/current', async (req, res) => {
-  const team = req.query.team;
-  if (!team) return res.status(400).json({ error: 'Missing team' });
-  const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
-  if (!res.headersSent) res.json({
-    size: SIZE,
-    walls: mazeWalls,
-    tiles: mazeState.map(t => ({
-      ...t,
-      currentProgress: t.completionsDone || 0,
-      taskType:   taskDefinitions[t.id]?.taskType   || null,
-      taskConfig: taskDefinitions[t.id]?.taskConfig || null
-    })),
-    boobytraps: boobytrapPositions,
-    tileDescriptions
-  });
+app.get('/api/current', async (req, res, next) => {
+  try {
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
+    res.json({
+      size: SIZE,
+      walls: mazeWalls,
+      tiles: mazeState.map(t => ({
+        ...t,
+        currentProgress: t.completionsDone || 0,
+        taskType:   taskDefinitions[t.id]?.taskType   || null,
+        taskConfig: taskDefinitions[t.id]?.taskConfig || null
+      })),
+      boobytraps: boobytrapPositions,
+      tileDescriptions
+    });
+  } catch (err) { next(err); }
 });
 
-app.get('/api/maze', async (req, res) => {
-  const team = req.query.team;
-  if (!team) return res.status(400).json({ error: 'Missing team' });
-  const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
-  if (!res.headersSent) res.json({
-    size: SIZE,
-    walls: mazeWalls,
-    tiles: mazeState.map(t => ({
-      ...t,
-      currentProgress: t.completionsDone || 0,
-      taskType:   taskDefinitions[t.id]?.taskType   || null,
-      taskConfig: taskDefinitions[t.id]?.taskConfig || null
-    })),
-    boobytraps: boobytrapPositions,
-    tileDescriptions
-  });
+app.get('/api/maze', async (req, res, next) => {
+  try {
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
+    res.json({
+      size: SIZE,
+      walls: mazeWalls,
+      tiles: mazeState.map(t => ({
+        ...t,
+        currentProgress: t.completionsDone || 0,
+        taskType:   taskDefinitions[t.id]?.taskType   || null,
+        taskConfig: taskDefinitions[t.id]?.taskConfig || null
+      })),
+      boobytraps: boobytrapPositions,
+      tileDescriptions
+    });
+  } catch (err) { next(err); }
 });
 
 // Create a new maze from a save file.
 // Accepts taskDefinitions as either an array [{ tileId, taskType, taskConfig }]
 // or an object keyed by tileId. Setting taskConfig.target auto-sets completionsRequired.
-app.post('/api/create', async (req, res) => {
-  const team = req.query.team;
-  if (!team) return res.status(400).json({ error: 'Missing team' });
-  const { saveData } = req.body;
-  if (!saveData) return res.status(400).json({ error: 'Missing saveData' });
-  let loaded;
+app.post('/api/create', async (req, res, next) => {
   try {
-    loaded = typeof saveData === 'string' ? JSON.parse(saveData) : saveData;
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid JSON in saveData' });
-  }
-  if (!loaded || !Array.isArray(loaded.mazeWalls)) {
-    return res.status(400).json({ error: 'Invalid save file format' });
-  }
-  const mazeSize = loaded.size || SIZE;
-  const mazeWalls = loaded.mazeWalls;
-  const boobytrapPositions = loaded.boobytraps || [];
-  const tileDescriptions = loaded.tileDescriptions || {};
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const { saveData } = req.body;
+    if (!saveData) return res.status(400).json({ error: 'Missing saveData' });
+    let loaded;
+    try {
+      loaded = typeof saveData === 'string' ? JSON.parse(saveData) : saveData;
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid JSON in saveData' });
+    }
+    if (!loaded || !Array.isArray(loaded.mazeWalls)) {
+      return res.status(400).json({ error: 'Invalid save file format' });
+    }
+    const mazeSize           = loaded.size || SIZE;
+    const mazeWalls          = loaded.mazeWalls;
+    const boobytrapPositions = loaded.boobytraps || [];
+    const tileDescriptions   = loaded.tileDescriptions || {};
 
-  // Normalise taskDefinitions to { [tileId]: { taskType, taskConfig } }
-  let taskDefObj = {};
-  const raw = loaded.taskDefinitions;
-  if (Array.isArray(raw)) {
-    raw.forEach(d => { taskDefObj[d.tileId] = { taskType: d.taskType, taskConfig: d.taskConfig }; });
-  } else if (raw && typeof raw === 'object') {
-    taskDefObj = raw;
-  }
+    // Normalise taskDefinitions to { [tileId]: { taskType, taskConfig } }
+    let taskDefObj = {};
+    const raw = loaded.taskDefinitions;
+    if (Array.isArray(raw)) {
+      raw.forEach(d => { taskDefObj[d.tileId] = { taskType: d.taskType, taskConfig: d.taskConfig }; });
+    } else if (raw && typeof raw === 'object') {
+      taskDefObj = raw;
+    }
 
-  // Build initial tile state; use taskConfig.target as completionsRequired when present.
-  const mazeState = Array(mazeSize * mazeSize).fill().map((_, i) => {
-    const tileId = i + 1;
-    const def = taskDefObj[tileId];
-    return {
-      id: tileId,
-      completed: false,
-      completionsRequired: def?.taskConfig?.target || 1,
-      completionsDone: 0
-    };
-  });
+    // Build initial tile state; use taskConfig.target as completionsRequired when present.
+    const mazeState = Array(mazeSize * mazeSize).fill().map((_, i) => {
+      const tileId = i + 1;
+      const def = taskDefObj[tileId];
+      return {
+        id: tileId,
+        completed: false,
+        completionsRequired: def?.taskConfig?.target || 1,
+        completionsDone: 0
+      };
+    });
 
-  await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
-  await saveTaskDefinitions(team, taskDefObj);
-  // Clear previous progress log when a new maze is created.
-  await dbQuery('DELETE FROM tile_progress WHERE team = ?', [team]);
-  res.json({ success: true });
+    await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+    await saveTaskDefinitions(team, taskDefObj);
+    // Clear previous progress log when a new maze is created.
+    await dbQuery('DELETE FROM tile_progress WHERE team = ?', [team]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
 });
 
 const tasks = [
@@ -510,33 +574,41 @@ app.get('/api/tasks', (req, res) => {
 });
 
 // Uncomplete a tile if it has exactly 1 adjacent completed tile.
-app.post('/api/tiles/uncomplete/:id', async (req, res) => {
-  const team = req.query.team;
-  const id = parseInt(req.params.id, 10);
-  let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions } = await loadMazeFromDb(team);
-  const tile = mazeState.find(t => t.id === id);
-  if (!tile)           return res.status(404).json({ error: 'Tile not found' });
-  if (!tile.completed) return res.status(400).json({ error: 'Tile is not completed' });
-  const idx = id - 1;
-  const row = Math.floor(idx / SIZE);
-  const col = idx % SIZE;
-  const neighbors = [
-    { r: row - 1, c: col }, { r: row + 1, c: col },
-    { r: row, c: col - 1 }, { r: row, c: col + 1 }
-  ];
-  let completedCount = 0;
-  for (const { r, c } of neighbors) {
-    if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
-      if (mazeState[r * SIZE + c].completed) completedCount++;
+app.post('/api/tiles/uncomplete/:id', async (req, res, next) => {
+  try {
+    const team = req.query.team;
+    const id   = parseInt(req.params.id, 10);
+    let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions } = await loadMazeFromDb(team);
+    const tile = mazeState.find(t => t.id === id);
+    if (!tile)           return res.status(404).json({ error: 'Tile not found' });
+    if (!tile.completed) return res.status(400).json({ error: 'Tile is not completed' });
+    const idx  = id - 1;
+    const row  = Math.floor(idx / SIZE);
+    const col  = idx % SIZE;
+    const neighbors = [
+      { r: row - 1, c: col }, { r: row + 1, c: col },
+      { r: row, c: col - 1 }, { r: row, c: col + 1 }
+    ];
+    let completedCount = 0;
+    for (const { r, c } of neighbors) {
+      if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
+        if (mazeState[r * SIZE + c].completed) completedCount++;
+      }
     }
-  }
-  if (completedCount !== 1) {
-    return res.status(400).json({ error: 'Tile cannot be uncompleted (must have exactly 1 adjacent completed tile)' });
-  }
-  if (tile.completionsDone > 0) tile.completionsDone--;
-  if (tile.completionsDone < (tile.completionsRequired || 1)) tile.completed = false;
-  await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
-  res.json({ success: true, tile });
+    if (completedCount !== 1) {
+      return res.status(400).json({ error: 'Tile cannot be uncompleted (must have exactly 1 adjacent completed tile)' });
+    }
+    if (tile.completionsDone > 0) tile.completionsDone--;
+    if (tile.completionsDone < (tile.completionsRequired || 1)) tile.completed = false;
+    await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+    res.json({ success: true, tile });
+  } catch (err) { next(err); }
+});
+
+// Global error handler — catches any unhandled errors from route handlers.
+app.use((err, req, res, next) => {
+  console.error(`[${req.method} ${req.path}]`, err);
+  if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;

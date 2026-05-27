@@ -11,9 +11,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- API-DRIVEN MAZE RENDERING ---
     async function fetchMazeState() {
-        const team = getTeamFromUrl();
-        const res = await fetch(`${API_BASE}/api/maze?team=${encodeURIComponent(team)}`);
-        return await res.json();
+        const team       = getTeamFromUrl();
+        const controller = new AbortController();
+        const timeoutId  = setTimeout(() => controller.abort(), 5000);
+        try {
+            const res = await fetch(`${API_BASE}/api/maze?team=${encodeURIComponent(team)}`, { signal: controller.signal });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            console.error('Failed to fetch maze state:', err);
+            return null;
+        } finally {
+            clearTimeout(timeoutId);
+        }
     }
 
     // Returns a human-readable progress label for a tile based on its task type.
@@ -43,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function renderMazeFromAPI() {
         const state = await fetchMazeState();
+        if (!state) return; // API unavailable — skip this render cycle, next poll will retry
         grid.innerHTML = '';
         tiles = [];
         const revealed = new Set();

@@ -12,6 +12,16 @@ const commands = [
     .setDescription('Complete a tile by ID')
     .addStringOption(option => option.setName('id').setDescription('Tile ID (number, start, or end)').setRequired(true)),
   new SlashCommandBuilder()
+    .setName('submittask')
+    .setDescription('Submit progress toward a tile task')
+    .addIntegerOption(option => option.setName('tile').setDescription('Tile ID').setRequired(true))
+    .addStringOption(option => option.setName('player').setDescription('Your RSN (RuneScape name)').setRequired(true))
+    .addIntegerOption(option => option.setName('amount').setDescription('Amount to submit (default: 1)').setRequired(false)),
+  new SlashCommandBuilder()
+    .setName('progress')
+    .setDescription('Show progress breakdown for a tile')
+    .addIntegerOption(option => option.setName('tile').setDescription('Tile ID').setRequired(true)),
+  new SlashCommandBuilder()
     .setName('createmaze')
     .setDescription('Create a new maze')
     .addAttachmentOption(option => option.setName('savefile').setDescription('Optional save file (JSON)').setRequired(false)),
@@ -174,6 +184,89 @@ client.on('interactionCreate', async interaction => {
         return;
       }
       await interaction.editReply('New maze created!');
+    } catch (e) {
+      await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
+    }
+  }
+
+  if (interaction.commandName === 'submittask') {
+    const channelId = interaction.channelId;
+    if (completionInProgress.has(channelId)) {
+      await interaction.reply({ content: 'Please wait for the previous submission to finish in this channel.', ephemeral: true });
+      return;
+    }
+    completionInProgress.add(channelId);
+    try {
+      await interaction.deferReply();
+      const tileId     = interaction.options.getInteger('tile');
+      const playerName = interaction.options.getString('player');
+      const amount     = interaction.options.getInteger('amount') || 1;
+      if (amount < 1) {
+        await interaction.editReply({ content: 'Amount must be at least 1.', flags: 64 });
+        return;
+      }
+      const res = await fetch(
+        `${API_BASE}/tiles/progress/${tileId}?team=${encodeURIComponent(team)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerName, amount })
+        }
+      );
+      let data;
+      try { data = await res.json(); } catch (e) {
+        await interaction.editReply({ content: 'Error: Unexpected response from server.', flags: 64 });
+        return;
+      }
+      if (data.error) {
+        await interaction.editReply({ content: `Error: ${data.error}`, flags: 64 });
+        return;
+      }
+      if (data.alreadyCompleted) {
+        await interaction.editReply({ content: `Tile ${tileId} is already completed!`, flags: 64 });
+        return;
+      }
+      const pct     = Math.min(100, Math.round((data.progress / data.target) * 100));
+      const bar     = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10));
+      const special = data.specialEvent ? `\n\n**${data.specialEvent.message}**` : '';
+      const status  = data.completed ? '✅ **Tile completed!**\n' : '';
+      await interaction.editReply(
+        `${status}**Tile ${tileId}** — submitted **${amount}** by **${playerName}**\n` +
+        `${bar} ${data.progress} / ${data.target}${special}`
+      );
+    } catch (e) {
+      await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
+    } finally {
+      completionInProgress.delete(channelId);
+    }
+  }
+
+  if (interaction.commandName === 'progress') {
+    try {
+      await interaction.deferReply();
+      const tileId = interaction.options.getInteger('tile');
+      const res = await fetch(`${API_BASE}/tiles/progress/${tileId}?team=${encodeURIComponent(team)}`);
+      let data;
+      try { data = await res.json(); } catch (e) {
+        await interaction.editReply({ content: 'Error: Unexpected response from server.', flags: 64 });
+        return;
+      }
+      if (data.error) {
+        await interaction.editReply({ content: `Error: ${data.error}`, flags: 64 });
+        return;
+      }
+      const pct  = Math.min(100, Math.round((data.currentProgress / data.target) * 100));
+      const bar  = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10));
+      let header = `**Tile ${tileId}**`;
+      if (data.taskType === 'npc_kill')  header += ` — Kill **${data.taskConfig.npc}** ×${data.target}`;
+      if (data.taskType === 'xp_gain')   header += ` — Gain **${data.target.toLocaleString()} ${data.taskConfig.skill} XP**`;
+      if (data.taskType === 'item_drop') header += ` — Receive **${data.taskConfig.item}** from ${data.taskConfig.npc}`;
+      const contribs = data.contributions.length
+        ? data.contributions.map(c => `• **${c.playerName}**: ${c.amount}`).join('\n')
+        : '_No progress submitted yet._';
+      await interaction.editReply(
+        `${header}\n${bar} ${data.currentProgress} / ${data.target} (${pct}%)\n\n${contribs}`
+      );
     } catch (e) {
       await interaction.editReply({ content: `Error: ${e.message}`, flags: 64 });
     }

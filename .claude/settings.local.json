@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\DeclercqT\\\\Documents\\\\MazeRace\" -Force)",
+      "Bash(Select-Object -Property Mode, Name)"
+    ]
+  }
+}

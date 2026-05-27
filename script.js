@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById('grid');
+    const API_BASE = 'https://mazeracebingo.onrender.com';
     let tiles = [];
 
     // --- TEAM PARAMETER SUPPORT ---
@@ -11,8 +12,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- API-DRIVEN MAZE RENDERING ---
     async function fetchMazeState() {
         const team = getTeamFromUrl();
-        const res = await fetch(`https://mazeracebingo.onrender.com/api/maze?team=${encodeURIComponent(team)}`);
+        const res = await fetch(`${API_BASE}/api/maze?team=${encodeURIComponent(team)}`);
         return await res.json();
+    }
+
+    // Returns a human-readable progress label for a tile based on its task type.
+    function progressLabel(tileData) {
+        const progress = tileData.currentProgress ?? tileData.completionsDone ?? 0;
+        const target   = tileData.completionsRequired ?? 1;
+        if (target <= 1) return null;
+        const cfg  = tileData.taskConfig;
+        const type = tileData.taskType;
+        if (type === 'npc_kill')  return `${progress} / ${target} kills`;
+        if (type === 'xp_gain')   return `${progress.toLocaleString()} / ${target.toLocaleString()} xp`;
+        if (type === 'item_drop') return progress >= target ? 'obtained' : 'not yet';
+        return `${progress} / ${target}`;
     }
 
     // Helper to get adjacent tile indices
@@ -153,27 +167,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 // --- END DEAD-END DETECTION ---
             } else if (revealed.has(i)) {
-                tile.textContent = tileData.id;
                 tile.classList.add('revealed');
                 tile.dataset.visible = 'true';
-                // Visual: darker blue for higher completions still needed
-                if (!tileData.completed && completionsRequired > 1) {
-                    // completionsLeft = completionsRequired - completionsDone
-                    const completionsLeft = completionsRequired - (tileData.completionsDone || 0);
-                    if (completionsLeft > 1) {
-                        const darken = Math.min((completionsLeft - 1) * 20, 120);
-                        const r = Math.max(33 - darken, 0);
-                        const g = Math.max(150 - darken, 0);
-                        const b = Math.max(243 - darken, 60); // don't go too dark
-                        tile.style.background = `rgb(${r},${g},${b})`;
-                        tile.style.color = '#fff';
-                    } else {
-                        tile.style.background = '';
-                        tile.style.color = '';
-                    }
+                tile.style.background = '';
+                tile.style.color = '';
+                // Show progress label beneath tile ID when a task has a target > 1
+                const label = progressLabel(tileData);
+                if (label) {
+                    tile.innerHTML = `<span class="tile-id">${tileData.id}</span><span class="tile-progress">${label}</span>`;
                 } else {
-                    tile.style.background = '';
-                    tile.style.color = '';
+                    tile.textContent = tileData.id;
                 }
                 // Remove wall classes for revealed but not completed
                 tile.classList.remove('wall-top', 'wall-right', 'wall-bottom', 'wall-left');
@@ -203,10 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             tile.onclick = async () => {
                 if (tile.dataset.visible === 'true' && !tile.classList.contains('clicked') && tile.textContent !== 'END') {
-                    const tileId = parseInt(tile.dataset.number, 10);
-                    const team = getTeamFromUrl();
-                    await fetch(`https://mazeracebingo-1.onrender.com/api/tiles/complete/${tileId}?team=${encodeURIComponent(team)}`, { method: 'POST' });
-                    await renderMazeFromAPI();
+                    await openProgressModal(tileData, state);
                 }
             };
             tiles.push(tile);
@@ -234,6 +234,56 @@ document.addEventListener('DOMContentLoaded', () => {
                     return `<li>Tile ${t.id}: ${desc}</li>`;
                 }).join('') + '</ul>';
         }
+    }
+
+    // --- PROGRESS MODAL ---
+    const progressModal      = document.getElementById('progress-modal');
+    const progressModalTitle = document.getElementById('progress-modal-title');
+    const progressModalBody  = document.getElementById('progress-modal-body');
+    const closeProgressModal = document.getElementById('close-progress-modal');
+
+    closeProgressModal.addEventListener('click', () => { progressModal.style.display = 'none'; });
+    window.addEventListener('click', e => { if (e.target === progressModal) progressModal.style.display = 'none'; });
+
+    async function openProgressModal(tileData, state) {
+        const team   = getTeamFromUrl();
+        const tileId = tileData.id;
+        const desc   = (state.tileDescriptions || {})[tileId] || '';
+        progressModalTitle.textContent = `Tile ${tileId}${desc ? ': ' + desc : ''}`;
+        progressModalBody.innerHTML = '<em>Loading...</em>';
+        progressModal.style.display = 'block';
+        try {
+            const res  = await fetch(`${API_BASE}/api/tiles/progress/${tileId}?team=${encodeURIComponent(team)}`);
+            const data = await res.json();
+            const cfg  = data.taskConfig;
+            let taskLine = '';
+            if (data.taskType === 'npc_kill')  taskLine = `Kill <b>${cfg.npc}</b> — ${data.currentProgress} / ${data.target} kills`;
+            else if (data.taskType === 'xp_gain')   taskLine = `Gain <b>${data.target.toLocaleString()} ${cfg.skill} XP</b> — ${data.currentProgress.toLocaleString()} / ${data.target.toLocaleString()}`;
+            else if (data.taskType === 'item_drop')  taskLine = `Receive <b>${cfg.item}</b> from ${cfg.npc}`;
+            else taskLine = `Progress: ${data.currentProgress} / ${data.target}`;
+            const pct  = Math.min(100, Math.round((data.currentProgress / data.target) * 100));
+            const contribRows = data.contributions.length
+                ? data.contributions.map(c => `<tr><td>${escapeHtml(c.playerName)}</td><td>${c.amount}</td></tr>`).join('')
+                : '<tr><td colspan="2"><em>No progress yet</em></td></tr>';
+            progressModalBody.innerHTML = `
+                <p>${taskLine}</p>
+                <div style="background:#ddd;border-radius:4px;height:14px;margin-bottom:12px;">
+                    <div style="background:#4caf50;width:${pct}%;height:100%;border-radius:4px;"></div>
+                </div>
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead><tr style="text-align:left;border-bottom:1px solid #ccc;">
+                        <th style="padding:4px 8px;">Player</th>
+                        <th style="padding:4px 8px;">Contributed</th>
+                    </tr></thead>
+                    <tbody>${contribRows}</tbody>
+                </table>`;
+        } catch (e) {
+            progressModalBody.innerHTML = '<em>Failed to load progress.</em>';
+        }
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // --- TASK LIST MODAL ---

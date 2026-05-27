@@ -148,6 +148,7 @@ body {
     background: #000; /* Hidden tiles are black */
     color: #fff;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     font-size: 1.5rem;
@@ -156,6 +157,19 @@ body {
     transition: background 0.2s, color 0.2s;
     border: 2px solid transparent;
     box-sizing: border-box;
+}
+
+.tile-id {
+    line-height: 1;
+}
+
+.tile-progress {
+    font-size: 0.45rem;
+    font-weight: bold;
+    margin-top: 2px;
+    opacity: 0.85;
+    text-align: center;
+    line-height: 1.1;
 }
 
 .tile:hover {

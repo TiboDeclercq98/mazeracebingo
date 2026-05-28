@@ -1,11 +1,11 @@
 // Express API for Maze Bingo
-// npm install express canvas cors mysql2 playwright
+// npm install express canvas cors pg playwright
 
 const express = require('express');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 const cors = require('cors');
-const mysql = require('mysql2');
+const { Pool } = require('pg');
 const { chromium } = require('playwright');
 const app = express();
 app.use(express.json());
@@ -26,16 +26,21 @@ app.use((req, res, next) => {
 const SIZE = 9; // 9x9 grid
 // No global maze state — all state is per-request.
 
-const mysqlConfig = require('./mysql-config');
-const db = mysql.createPool(mysqlConfig);
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 function dbQuery(sql, params) {
-  return new Promise((resolve, reject) => {
-    db.query(sql, params, (err, results) => {
-      if (err) reject(err);
-      else resolve(results);
-    });
-  });
+  return db.query(sql, params).then(r => r.rows);
+}
+
+function batchInsertQuery(table, columns, rows) {
+  const colCount = columns.length;
+  const placeholders = rows.map((_, ri) =>
+    `(${columns.map((_, ci) => `$${ri * colCount + ci + 1}`).join(', ')})`
+  ).join(', ');
+  return { sql: `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${placeholders}`, params: rows.flat() };
 }
 
 // --- TABLE CREATION (run once at startup) ---
@@ -43,7 +48,7 @@ async function initDb() {
   await dbQuery(`CREATE TABLE IF NOT EXISTS tiles (
     id INT,
     team VARCHAR(64),
-    completed TINYINT,
+    completed SMALLINT,
     completionsRequired INT DEFAULT 1,
     completionsDone INT DEFAULT 0,
     PRIMARY KEY (id, team)
@@ -52,7 +57,7 @@ async function initDb() {
     row INT,
     col INT,
     team VARCHAR(64),
-    walls TEXT
+    walls JSONB
   )`);
   await dbQuery(`CREATE TABLE IF NOT EXISTS boobytraps (
     row INT,
@@ -69,18 +74,18 @@ async function initDb() {
     tileId INT NOT NULL,
     team VARCHAR(64) NOT NULL,
     taskType VARCHAR(32) NOT NULL,
-    taskConfig JSON NOT NULL,
+    taskConfig JSONB NOT NULL,
     PRIMARY KEY (tileId, team)
   )`);
   // Append-only log of individual player progress contributions.
   // completionsDone on the tiles table is kept in sync as a cached SUM.
   await dbQuery(`CREATE TABLE IF NOT EXISTS tile_progress (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     tileId INT NOT NULL,
     team VARCHAR(64) NOT NULL,
     playerName VARCHAR(64) NOT NULL,
     amount INT NOT NULL DEFAULT 1,
-    submittedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    submittedAt TIMESTAMPTZ DEFAULT NOW()
   )`);
 }
 initDb();
@@ -185,13 +190,13 @@ process.on('SIGINT',  shutdown);
 
 async function loadMazeFromDb(team) {
   let mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions;
-  const tiles = await dbQuery('SELECT * FROM tiles WHERE team = ?', [team]);
+  const tiles = await dbQuery('SELECT * FROM tiles WHERE team = $1', [team]);
   if (tiles.length > 0) {
     mazeState = tiles.map(t => ({
       id: t.id,
       completed: !!t.completed,
-      completionsRequired: t.completionsRequired !== undefined ? t.completionsRequired : 1,
-      completionsDone: t.completionsDone !== undefined ? t.completionsDone : 0
+      completionsRequired: t.completionsrequired !== undefined ? t.completionsrequired : 1,
+      completionsDone: t.completionsdone !== undefined ? t.completionsdone : 0
     }));
   } else {
     mazeState = Array(SIZE * SIZE).fill().map((_, i) => ({ id: i + 1, completed: false, completionsRequired: 1, completionsDone: 0 }));
@@ -201,49 +206,57 @@ async function loadMazeFromDb(team) {
     taskDefinitions = {};
     await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
   }
-  const wallsRows = await dbQuery('SELECT * FROM walls WHERE team = ?', [team]);
-  mazeWalls = wallsRows.map(r => ({ row: r.row, col: r.col, walls: JSON.parse(r.walls) }));
-  const traps = await dbQuery('SELECT * FROM boobytraps WHERE team = ?', [team]);
+  const wallsRows = await dbQuery('SELECT * FROM walls WHERE team = $1', [team]);
+  mazeWalls = wallsRows.map(r => ({ row: r.row, col: r.col, walls: r.walls }));
+  const traps = await dbQuery('SELECT * FROM boobytraps WHERE team = $1', [team]);
   boobytrapPositions = traps.map(t => ({ row: t.row, col: t.col }));
-  const descs = await dbQuery('SELECT * FROM tileDescriptions WHERE team = ?', [team]);
+  const descs = await dbQuery('SELECT * FROM tileDescriptions WHERE team = $1', [team]);
   tileDescriptions = {};
-  descs.forEach(d => { tileDescriptions[d.tileId] = d.description; });
-  const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE team = ?', [team]);
+  descs.forEach(d => { tileDescriptions[d.tileid] = d.description; });
+  const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE team = $1', [team]);
   taskDefinitions = {};
-  taskDefs.forEach(d => { taskDefinitions[d.tileId] = { taskType: d.taskType, taskConfig: JSON.parse(d.taskConfig) }; });
+  taskDefs.forEach(d => { taskDefinitions[d.tileid] = { taskType: d.tasktype, taskConfig: d.taskconfig }; });
   return { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions };
 }
 
 // All writes are wrapped in a single transaction; uses batch INSERTs to minimise round-trips.
 async function saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions) {
-  const conn = await new Promise((res, rej) => db.getConnection((err, c) => err ? rej(err) : res(c)));
-  const txQuery = (sql, params) => new Promise((res, rej) => conn.query(sql, params, (e, r) => e ? rej(e) : res(r)));
+  const client = await db.connect();
+  const txQuery = (sql, params) => client.query(sql, params).then(r => r.rows);
   try {
-    await txQuery('START TRANSACTION');
+    await txQuery('BEGIN');
 
-    await txQuery('DELETE FROM tiles WHERE team = ?', [team]);
+    await txQuery('DELETE FROM tiles WHERE team = $1', [team]);
     if (mazeState.length > 0) {
-      const vals = mazeState.map(t => [t.id, team, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0]);
-      await txQuery('INSERT INTO tiles (id, team, completed, completionsRequired, completionsDone) VALUES ?', [vals]);
+      const q = batchInsertQuery('tiles',
+        ['id', 'team', 'completed', 'completionsRequired', 'completionsDone'],
+        mazeState.map(t => [t.id, team, t.completed ? 1 : 0, t.completionsRequired || 1, t.completionsDone || 0]));
+      await txQuery(q.sql, q.params);
     }
 
-    await txQuery('DELETE FROM walls WHERE team = ?', [team]);
+    await txQuery('DELETE FROM walls WHERE team = $1', [team]);
     if (mazeWalls.length > 0) {
-      const vals = mazeWalls.map(w => [w.row, w.col, team, JSON.stringify(w.walls)]);
-      await txQuery('INSERT INTO walls (row, col, team, walls) VALUES ?', [vals]);
+      const q = batchInsertQuery('walls',
+        ['row', 'col', 'team', 'walls'],
+        mazeWalls.map(w => [w.row, w.col, team, w.walls]));
+      await txQuery(q.sql, q.params);
     }
 
-    await txQuery('DELETE FROM boobytraps WHERE team = ?', [team]);
+    await txQuery('DELETE FROM boobytraps WHERE team = $1', [team]);
     if (boobytrapPositions.length > 0) {
-      const vals = boobytrapPositions.map(b => [b.row, b.col, team]);
-      await txQuery('INSERT INTO boobytraps (row, col, team) VALUES ?', [vals]);
+      const q = batchInsertQuery('boobytraps',
+        ['row', 'col', 'team'],
+        boobytrapPositions.map(b => [b.row, b.col, team]));
+      await txQuery(q.sql, q.params);
     }
 
-    await txQuery('DELETE FROM tileDescriptions WHERE team = ?', [team]);
+    await txQuery('DELETE FROM tileDescriptions WHERE team = $1', [team]);
     const descEntries = Object.entries(tileDescriptions);
     if (descEntries.length > 0) {
-      const vals = descEntries.map(([tileId, description]) => [tileId, team, description]);
-      await txQuery('INSERT INTO tileDescriptions (tileId, team, description) VALUES ?', [vals]);
+      const q = batchInsertQuery('tileDescriptions',
+        ['tileId', 'team', 'description'],
+        descEntries.map(([tileId, description]) => [tileId, team, description]));
+      await txQuery(q.sql, q.params);
     }
 
     await txQuery('COMMIT');
@@ -251,17 +264,19 @@ async function saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tile
     await txQuery('ROLLBACK').catch(() => {});
     throw err;
   } finally {
-    conn.release();
+    client.release();
   }
 }
 
 // Replaces all taskDefinitions for a team. Called only from POST /api/create.
 async function saveTaskDefinitions(team, taskDefinitions) {
-  await dbQuery('DELETE FROM taskDefinitions WHERE team = ?', [team]);
+  await dbQuery('DELETE FROM taskDefinitions WHERE team = $1', [team]);
   const entries = Object.entries(taskDefinitions);
   if (entries.length > 0) {
-    const vals = entries.map(([tileId, def]) => [tileId, team, def.taskType, JSON.stringify(def.taskConfig)]);
-    await dbQuery('INSERT INTO taskDefinitions (tileId, team, taskType, taskConfig) VALUES ?', [vals]);
+    const q = batchInsertQuery('taskDefinitions',
+      ['tileId', 'team', 'taskType', 'taskConfig'],
+      entries.map(([tileId, def]) => [tileId, team, def.taskType, def.taskConfig]));
+    await dbQuery(q.sql, q.params);
   }
 }
 
@@ -293,7 +308,7 @@ async function submitTileProgress(team, id, playerName, amount) {
 
   // Record the individual contribution before updating the tile.
   await dbQuery(
-    'INSERT INTO tile_progress (tileId, team, playerName, amount) VALUES (?, ?, ?, ?)',
+    'INSERT INTO tile_progress (tileId, team, playerName, amount) VALUES ($1, $2, $3, $4)',
     [id, team, playerName, amount]
   );
 
@@ -452,21 +467,21 @@ app.get('/api/tiles/progress/:id', async (req, res, next) => {
     const { mazeState } = await loadMazeFromDb(team);
     const tile = mazeState.find(t => t.id === id);
     if (!tile) return res.status(404).json({ error: 'Tile not found' });
-    const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE tileId = ? AND team = ?', [id, team]);
+    const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE tileid = $1 AND team = $2', [id, team]);
     const taskDef  = taskDefs[0] || null;
     const rows = await dbQuery(
-      `SELECT playerName, SUM(amount) AS total, MAX(submittedAt) AS lastSubmitted
-       FROM tile_progress WHERE tileId = ? AND team = ?
-       GROUP BY playerName ORDER BY total DESC`,
+      `SELECT playername, SUM(amount) AS total, MAX(submittedat) AS lastsubmitted
+       FROM tile_progress WHERE tileid = $1 AND team = $2
+       GROUP BY playername ORDER BY total DESC`,
       [id, team]
     );
     res.json({
       tileId: id,
-      taskType:        taskDef ? taskDef.taskType             : null,
-      taskConfig:      taskDef ? JSON.parse(taskDef.taskConfig) : null,
+      taskType:        taskDef ? taskDef.tasktype   : null,
+      taskConfig:      taskDef ? taskDef.taskconfig : null,
       currentProgress: tile.completionsDone || 0,
       target:          tile.completionsRequired || 1,
-      contributions:   rows.map(r => ({ playerName: r.playerName, amount: r.total, lastSubmitted: r.lastSubmitted }))
+      contributions:   rows.map(r => ({ playerName: r.playername, amount: r.total, lastSubmitted: r.lastsubmitted }))
     });
   } catch (err) { next(err); }
 });
@@ -558,7 +573,7 @@ app.post('/api/create', async (req, res, next) => {
     await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
     await saveTaskDefinitions(team, taskDefObj);
     // Clear previous progress log when a new maze is created.
-    await dbQuery('DELETE FROM tile_progress WHERE team = ?', [team]);
+    await dbQuery('DELETE FROM tile_progress WHERE team = $1', [team]);
     res.json({ success: true });
   } catch (err) { next(err); }
 });

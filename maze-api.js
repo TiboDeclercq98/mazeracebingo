@@ -190,7 +190,7 @@ process.on('SIGINT',  shutdown);
 
 async function loadMazeFromDb(team) {
   let mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions;
-  const tiles = await dbQuery('SELECT * FROM tiles WHERE team = $1', [team]);
+  const tiles = await dbQuery('SELECT * FROM tiles WHERE team = $1 ORDER BY id', [team]);
   if (tiles.length > 0) {
     mazeState = tiles.map(t => ({
       id: t.id,

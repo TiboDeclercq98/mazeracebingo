@@ -2,7 +2,49 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\DeclercqT\\\\Documents\\\\MazeRace\" -Force)",
-      "Bash(Select-Object -Property Mode, Name)"
+      "Bash(Select-Object -Property Mode, Name)",
+      "PowerShell(claude mcp add --transport http render https://mcp.render.com/mcp --header \"Authorization: Bearer rnd_vzX5UzIyT7oSTiQh7JytoiBc8Sdx\")",
+      "PowerShell(\\(Get-Command claude -ErrorAction SilentlyContinue\\).Source; where.exe claude 2>$null)",
+      "PowerShell(Get-ChildItem \"$env:APPDATA\\\\npm\" -ErrorAction SilentlyContinue | Select-Object Name; npx claude --version 2>$null)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Read(//c/Users/Tibo Declercq/**)",
+      "Bash(claude mcp *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tibo Declercq\\\\.claude\" -Recurse -Force)",
+      "Bash(Select-Object FullName, LastWriteTime)",
+      "PowerShell(Get-Content \"$env:APPDATA\\\\Code\\\\User\\\\settings.json\" -ErrorAction SilentlyContinue | Select-String -Pattern \"mcp|claude\" -CaseSensitive:$false | Select-Object -First 20)",
+      "Bash(Get-ChildItem -Recurse -File -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\\\\mysql-config.js\")",
+      "PowerShell(Remove-Item \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\\\\mysql-config.js\" -Confirm:$false)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Force)",
+      "Bash(curl -s https://mazeracebingo.onrender.com/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://mazeracebingo-1.onrender.com)",
+      "Bash(curl -s https://mazeracebingo.onrender.com/api/tiles)",
+      "Bash(curl -s https://mazeracebingo.onrender.com/api/current)",
+      "Bash(curl -s https://mazeracebingo.onrender.com/api/maze)",
+      "Bash(curl -s https://mazeracebingo.onrender.com/api/tasks)",
+      "Bash(curl -s \"https://mazeracebingo.onrender.com/api/tiles?team=test\")",
+      "Bash(curl -s \"https://mazeracebingo.onrender.com/api/current?team=test\")",
+      "Bash(curl -s \"https://mazeracebingo.onrender.com/api/maze?team=test\")",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(curl -s -H \"Origin: https://mazeracebingo-1.onrender.com\" -I \"https://mazeracebingo.onrender.com/api/maze?team=test\")",
+      "Bash(curl -s -X POST \"https://mazeracebingo.onrender.com/api/tiles/complete/77?team=test\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(curl -s http://localhost:3000/api/maze)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/maze\" -UseBasicParsing -TimeoutSec 3; $r.StatusCode } catch { $_.Exception.Message })",
+      "PowerShell(Start-Process -FilePath \"node\" -ArgumentList \"maze-api.js\" -WorkingDirectory \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -WindowStyle Hidden; Start-Sleep -Seconds 3; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/maze?team=test\" -UseBasicParsing -TimeoutSec 5; \"Server up: $\\($r.StatusCode\\)\" } catch { \"Server check: $\\($_.Exception.Message\\)\" })",
+      "PowerShell($pg = Get-Command pg_ctl -ErrorAction SilentlyContinue; if \\($pg\\) { $pg.Source } else { \"pg_ctl not found\" }; $psql = Get-Command psql -ErrorAction SilentlyContinue; if \\($psql\\) { $psql.Source } else { \"psql not found\" })",
+      "Read(//c/Program Files/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Tibo Declercq\\.claude",
+      "C:\\Users\\Tibo Declercq"
     ]
   }
 }

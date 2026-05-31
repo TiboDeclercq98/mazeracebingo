@@ -17,8 +17,16 @@ def runeLiteVersion = '1.10.+'
 
 dependencies {
     compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
+    runtimeOnly  group: 'net.runelite', name: 'client', version: runeLiteVersion
     compileOnly 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'
+}
+
+task runClient(type: JavaExec, dependsOn: 'classes') {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.runelite.client.RuneLite'
+    args '--developer-mode'
+    jvmArgs '-ea'
 }
 
 compileJava {

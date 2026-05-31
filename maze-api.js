@@ -320,7 +320,6 @@ async function submitTileProgress(team, id, playerName, amount) {
     tile.completed = true;
 
     if (isEnd) {
-      mazeState.forEach(t => { t.revealed = true; });
       await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
       specialEvent = { type: 'gameover', message: 'The end tile was completed! The entire maze is now revealed. Game over.' };
     } else {
@@ -491,6 +490,8 @@ app.get('/api/current', async (req, res, next) => {
     const team = req.query.team;
     if (!team) return res.status(400).json({ error: 'Missing team' });
     const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
+    const endId = Math.floor(SIZE / 2) + 1;
+    const gameOver = mazeState.some(t => t.id === endId && t.completed);
     res.json({
       size: SIZE,
       walls: mazeWalls,
@@ -501,7 +502,8 @@ app.get('/api/current', async (req, res, next) => {
         taskConfig: taskDefinitions[t.id]?.taskConfig || null
       })),
       boobytraps: boobytrapPositions,
-      tileDescriptions
+      tileDescriptions,
+      gameOver
     });
   } catch (err) { next(err); }
 });
@@ -511,6 +513,8 @@ app.get('/api/maze', async (req, res, next) => {
     const team = req.query.team;
     if (!team) return res.status(400).json({ error: 'Missing team' });
     const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
+    const endId = Math.floor(SIZE / 2) + 1;
+    const gameOver = mazeState.some(t => t.id === endId && t.completed);
     res.json({
       size: SIZE,
       walls: mazeWalls,
@@ -521,7 +525,8 @@ app.get('/api/maze', async (req, res, next) => {
         taskConfig: taskDefinitions[t.id]?.taskConfig || null
       })),
       boobytraps: boobytrapPositions,
-      tileDescriptions
+      tileDescriptions,
+      gameOver
     });
   } catch (err) { next(err); }
 });

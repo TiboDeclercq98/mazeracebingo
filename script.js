@@ -64,6 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reveal START and END
         revealed.add(startIdx);
         revealed.add(endIdx);
+        // Game over: reveal the entire maze
+        if (state.gameOver) {
+            state.tiles.forEach((_, i) => revealed.add(i));
+        }
         // Helper to get wall object
         function getWallObj(idx) {
             const row = Math.floor(idx / state.size);

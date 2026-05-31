@@ -40,7 +40,9 @@
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/maze\" -UseBasicParsing -TimeoutSec 3; $r.StatusCode } catch { $_.Exception.Message })",
       "PowerShell(Start-Process -FilePath \"node\" -ArgumentList \"maze-api.js\" -WorkingDirectory \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -WindowStyle Hidden; Start-Sleep -Seconds 3; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/maze?team=test\" -UseBasicParsing -TimeoutSec 5; \"Server up: $\\($r.StatusCode\\)\" } catch { \"Server check: $\\($_.Exception.Message\\)\" })",
       "PowerShell($pg = Get-Command pg_ctl -ErrorAction SilentlyContinue; if \\($pg\\) { $pg.Source } else { \"pg_ctl not found\" }; $psql = Get-Command psql -ErrorAction SilentlyContinue; if \\($psql\\) { $psql.Source } else { \"psql not found\" })",
-      "Read(//c/Program Files/**)"
+      "Read(//c/Program Files/**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -File)",
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object FullName)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

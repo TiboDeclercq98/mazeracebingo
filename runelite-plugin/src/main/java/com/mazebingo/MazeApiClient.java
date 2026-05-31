@@ -14,7 +14,7 @@ import javax.inject.Singleton;
 @Singleton
 public class MazeApiClient {
 
-    private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
+    private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
 
     @Inject
     private OkHttpClient httpClient;

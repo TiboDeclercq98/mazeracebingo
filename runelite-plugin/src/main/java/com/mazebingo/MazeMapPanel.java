@@ -18,8 +18,9 @@ class MazeMapPanel extends JPanel {
     private static final Color COLOR_REVEALED   = new Color(55, 58, 60);
     private static final Color COLOR_HIDDEN     = new Color(20, 20, 20);
     private static final Color COLOR_GRID       = new Color(45, 45, 45);
-    private static final Color COLOR_WALL       = Color.BLACK;
     private static final Color COLOR_START      = new Color(255, 215, 0);
+    private static final Color COLOR_END        = new Color(200, 50, 50);
+    private static final Color COLOR_WALL       = Color.BLACK;
 
     private final MazeState state;
     private final Set<Integer> revealed;
@@ -43,6 +44,7 @@ class MazeMapPanel extends JPanel {
 
         int size = state.size;
         int startIdx = (size - 1) * size + size / 2;
+        int endIdx   = size / 2;
 
         // Fill tiles
         for (int row = 0; row < size; row++) {
@@ -55,7 +57,12 @@ class MazeMapPanel extends JPanel {
                 boolean done = tile != null && tile.completed;
                 boolean vis  = revealed != null && revealed.contains(idx);
 
-                g2.setColor(done ? COLOR_COMPLETED : (vis ? COLOR_REVEALED : COLOR_HIDDEN));
+                Color fill;
+                if (done)          fill = COLOR_COMPLETED;
+                else if (idx == endIdx) fill = COLOR_END;
+                else if (vis)      fill = COLOR_REVEALED;
+                else               fill = COLOR_HIDDEN;
+                g2.setColor(fill);
                 g2.fillRect(x, y, CELL, CELL);
             }
         }
@@ -75,7 +82,7 @@ class MazeMapPanel extends JPanel {
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
                 int idx = row * size + col;
-                if (revealed == null || !revealed.contains(idx)) continue;
+                if ((revealed == null || !revealed.contains(idx)) && idx != endIdx) continue;
                 TileData tile = idx < state.tiles.size() ? state.tiles.get(idx) : null;
                 if (tile == null) continue;
 
@@ -96,11 +103,14 @@ class MazeMapPanel extends JPanel {
         g2.setStroke(new BasicStroke(2f));
         g2.drawRect(PADDING + startCol * CELL + 1, PADDING + startRow * CELL + 1, CELL - 3, CELL - 3);
 
-        // Walls drawn last (thick, on top of everything)
+        // Walls for completed tiles only
         g2.setColor(COLOR_WALL);
         g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER));
         if (state.walls != null) {
             for (WallEntry entry : state.walls) {
+                int idx = entry.row * size + entry.col;
+                TileData tile = idx < state.tiles.size() ? state.tiles.get(idx) : null;
+                if (tile == null || !tile.completed) continue;
                 int x = PADDING + entry.col * CELL;
                 int y = PADDING + entry.row * CELL;
                 WallSides w = entry.walls;

@@ -64,15 +64,16 @@ public class MazeBingoPanel extends PluginPanel {
         tilesPanel = new JPanel();
         tilesPanel.setLayout(new BoxLayout(tilesPanel, BoxLayout.Y_AXIS));
         tilesPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-
-        JScrollPane tilesScroll = new JScrollPane(tilesPanel);
-        tilesScroll.setBorder(BorderFactory.createTitledBorder(
+        tilesPanel.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR), "Active Tasks"));
-        tilesScroll.getViewport().setBackground(ColorScheme.DARKER_GRAY_COLOR);
-        tilesScroll.setPreferredSize(new Dimension(0, 250));
 
-        add(topSection, BorderLayout.NORTH);
-        add(tilesScroll, BorderLayout.CENTER);
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        content.add(topSection);
+        content.add(tilesPanel);
+
+        add(content, BorderLayout.NORTH);
     }
 
     void updateMazeState(MazeState state) {

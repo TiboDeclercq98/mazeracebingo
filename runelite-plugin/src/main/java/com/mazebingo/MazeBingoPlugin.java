@@ -29,6 +29,8 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 
 import javax.inject.Inject;
+import net.runelite.client.config.ConfigManager;
+import com.google.inject.Provides;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -368,6 +370,11 @@ public class MazeBingoPlugin extends Plugin {
             }
         }
         return map;
+    }
+
+    @Provides
+    MazeBingoConfig provideConfig(ConfigManager configManager) {
+        return configManager.getConfig(MazeBingoConfig.class);
     }
 
     private static BufferedImage buildIcon() {

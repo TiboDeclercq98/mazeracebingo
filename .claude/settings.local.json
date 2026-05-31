@@ -48,7 +48,11 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\\\\runelite-plugin\" -Recurse -File)",
       "Bash(Select-Object FullName)",
-      "Bash(Head -30)"
+      "Bash(Head -30)",
+      "Bash(dir /s /b)",
+      "Bash(grep -E \"\\\\.\\(java|json|md|xml|gradle|properties|png|jpg|gif\\)$\")",
+      "PowerShell(cd \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\"; Get-ChildItem -Recurse -File -Exclude \"package-lock.json\" | Where-Object { $_.Extension -in @\\('.java', '.json', '.md', '.xml', '.gradle', '.properties', '.png', '.jpg', '.gif', '.ts', '.js'\\) } | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "PowerShell(cd \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\"; Get-ChildItem -Recurse -File | Where-Object { $_.Extension -in @\\('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico'\\) } | Select-Object -ExpandProperty FullName)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

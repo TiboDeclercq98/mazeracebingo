@@ -231,8 +231,7 @@ public class MazeBingoPlugin extends Plugin {
 
         executor.execute(() -> {
             ProgressResponse response = apiClient.postProgress(apiUrl, tile.id, playerName, amount, team);
-            panel.addActivity(tile, amount);
-            if (response != null && response.completed) {
+if (response != null && response.completed) {
                 refreshMazeState();
             }
         });
@@ -281,6 +280,7 @@ public class MazeBingoPlugin extends Plugin {
         activeTiles.clear();
         activeTiles.addAll(newActive);
         panel.setStatus("Connected");
+        panel.updateMazeState(state);
         panel.updateTiles(activeTiles);
     }
 

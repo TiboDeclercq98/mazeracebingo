@@ -1,5 +1,6 @@
 package com.mazebingo;
 
+import com.mazebingo.model.MazeState;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
@@ -8,19 +9,15 @@ import javax.inject.Inject;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 
 public class MazeBingoPanel extends PluginPanel {
 
-    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final int MAX_LOG_LINES = 20;
-
     private final JLabel statusLabel;
     private final JPanel tilesPanel;
-    private final DefaultListModel<String> activityModel;
     private Runnable onRefresh;
+    private volatile MazeState currentMazeState;
 
     @Inject
     MazeBingoPanel() {
@@ -53,6 +50,17 @@ public class MazeBingoPanel extends PluginPanel {
         headerPanel.add(topRow, BorderLayout.NORTH);
         headerPanel.add(statusLabel, BorderLayout.SOUTH);
 
+        JButton viewMazeButton = new JButton("View Maze");
+        viewMazeButton.setFont(FontManager.getRunescapeSmallFont());
+        viewMazeButton.setFocusPainted(false);
+        viewMazeButton.addActionListener(e -> openMazeMap());
+
+        JPanel topSection = new JPanel(new BorderLayout(0, 4));
+        topSection.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        topSection.setBorder(new EmptyBorder(0, 0, 6, 0));
+        topSection.add(headerPanel, BorderLayout.NORTH);
+        topSection.add(viewMazeButton, BorderLayout.SOUTH);
+
         tilesPanel = new JPanel();
         tilesPanel.setLayout(new BoxLayout(tilesPanel, BoxLayout.Y_AXIS));
         tilesPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -63,21 +71,29 @@ public class MazeBingoPanel extends PluginPanel {
         tilesScroll.getViewport().setBackground(ColorScheme.DARKER_GRAY_COLOR);
         tilesScroll.setPreferredSize(new Dimension(0, 250));
 
-        activityModel = new DefaultListModel<>();
-        JList<String> activityList = new JList<>(activityModel);
-        activityList.setFont(FontManager.getRunescapeSmallFont());
-        activityList.setForeground(Color.LIGHT_GRAY);
-        activityList.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-
-        JScrollPane activityScroll = new JScrollPane(activityList);
-        activityScroll.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR), "Recent Activity"));
-        activityScroll.getViewport().setBackground(ColorScheme.DARKER_GRAY_COLOR);
-        activityScroll.setPreferredSize(new Dimension(0, 130));
-
-        add(headerPanel, BorderLayout.NORTH);
+        add(topSection, BorderLayout.NORTH);
         add(tilesScroll, BorderLayout.CENTER);
-        add(activityScroll, BorderLayout.SOUTH);
+    }
+
+    void updateMazeState(MazeState state) {
+        this.currentMazeState = state;
+    }
+
+    private void openMazeMap() {
+        MazeState snapshot = currentMazeState;
+        if (snapshot == null) {
+            JOptionPane.showMessageDialog(this, "No maze data available yet.", "Maze Map", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        Set<Integer> revealed = MazeRevealCalculator.computeRevealed(snapshot);
+        MazeMapPanel mapPanel = new MazeMapPanel(snapshot, revealed);
+
+        JFrame frame = new JFrame("Maze Map");
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.setContentPane(mapPanel);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
     }
 
     void setOnRefresh(Runnable callback) {
@@ -112,25 +128,11 @@ public class MazeBingoPanel extends PluginPanel {
         });
     }
 
-    void addActivity(ActiveTile tile, int amount) {
-        SwingUtilities.invokeLater(() -> {
-            String line = String.format("[%s] Tile %d +%s",
-                LocalTime.now().format(TIME_FMT),
-                tile.id,
-                formatAmount(tile.taskType, amount));
-            activityModel.add(0, line);
-            while (activityModel.size() > MAX_LOG_LINES) {
-                activityModel.remove(activityModel.size() - 1);
-            }
-        });
-    }
-
     void clear() {
         SwingUtilities.invokeLater(() -> {
             tilesPanel.removeAll();
             tilesPanel.revalidate();
             tilesPanel.repaint();
-            activityModel.clear();
             statusLabel.setText("● Not connected");
             statusLabel.setForeground(Color.RED);
         });
@@ -167,11 +169,5 @@ public class MazeBingoPanel extends PluginPanel {
             return String.format("%,d / %,d xp", tile.completionsDone, req);
         }
         return tile.completionsDone + " / " + req;
-    }
-
-    private String formatAmount(String taskType, int amount) {
-        if ("xp_gain".equals(taskType)) return String.format("%,d xp", amount);
-        if ("npc_kill".equals(taskType)) return "kill";
-        return String.valueOf(amount);
     }
 }

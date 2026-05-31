@@ -33,9 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target <= 1) return null;
         const cfg  = tileData.taskConfig;
         const type = tileData.taskType;
-        if (type === 'npc_kill')  return `${progress} / ${target} kills`;
+        // if (type === 'npc_kill')  return `${progress} / ${target} kills`;
         if (type === 'xp_gain')   return `${progress.toLocaleString()} / ${target.toLocaleString()} xp`;
-        if (type === 'item_drop') return progress >= target ? 'obtained' : 'not yet';
+        // if (type === 'item_drop') return progress >= target ? 'obtained' : 'not yet';
         return `${progress} / ${target}`;
     }
 
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             tile.onclick = async () => {
-                if (tile.dataset.visible === 'true' && !tile.classList.contains('clicked') && tile.textContent !== 'END') {
+                if (tile.dataset.visible === 'true' && tile.textContent !== 'END') {
                     await openProgressModal(tileData, state);
                 }
             };

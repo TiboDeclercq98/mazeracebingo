@@ -20,6 +20,7 @@ public class MazeBingoPanel extends PluginPanel {
     private final JLabel statusLabel;
     private final JPanel tilesPanel;
     private final DefaultListModel<String> activityModel;
+    private Runnable onRefresh;
 
     @Inject
     MazeBingoPanel() {
@@ -35,9 +36,21 @@ public class MazeBingoPanel extends PluginPanel {
         statusLabel.setFont(FontManager.getRunescapeSmallFont());
         statusLabel.setForeground(Color.RED);
 
+        JButton refreshButton = new JButton("Refresh");
+        refreshButton.setFont(FontManager.getRunescapeSmallFont());
+        refreshButton.setFocusPainted(false);
+        refreshButton.addActionListener(e -> {
+            if (onRefresh != null) onRefresh.run();
+        });
+
+        JPanel topRow = new JPanel(new BorderLayout(6, 0));
+        topRow.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        topRow.add(title, BorderLayout.CENTER);
+        topRow.add(refreshButton, BorderLayout.EAST);
+
         JPanel headerPanel = new JPanel(new BorderLayout(0, 2));
         headerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-        headerPanel.add(title, BorderLayout.NORTH);
+        headerPanel.add(topRow, BorderLayout.NORTH);
         headerPanel.add(statusLabel, BorderLayout.SOUTH);
 
         tilesPanel = new JPanel();
@@ -65,6 +78,10 @@ public class MazeBingoPanel extends PluginPanel {
         add(headerPanel, BorderLayout.NORTH);
         add(tilesScroll, BorderLayout.CENTER);
         add(activityScroll, BorderLayout.SOUTH);
+    }
+
+    void setOnRefresh(Runnable callback) {
+        this.onRefresh = callback;
     }
 
     void setStatus(String message) {

@@ -27,13 +27,4 @@ public interface MazeBingoConfig extends Config {
         return "";
     }
 
-    @ConfigItem(
-        keyName = "autoSubmit",
-        name = "Auto Submit",
-        description = "Automatically submit progress when tasks are detected in-game",
-        position = 2
-    )
-    default boolean autoSubmit() {
-        return true;
-    }
 }

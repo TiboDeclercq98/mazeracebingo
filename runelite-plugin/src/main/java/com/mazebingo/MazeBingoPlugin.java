@@ -84,6 +84,7 @@ public class MazeBingoPlugin extends Plugin {
     @Override
     protected void startUp() {
         executor = Executors.newSingleThreadScheduledExecutor();
+        panel.setOnRefresh(() -> executor.execute(this::refreshMazeState));
 
         navButton = NavigationButton.builder()
             .tooltip("Maze Bingo")
@@ -110,6 +111,7 @@ public class MazeBingoPlugin extends Plugin {
             executor.shutdownNow();
         }
         clientToolbar.removeNavigation(navButton);
+        panel.setOnRefresh(null);
         activeTiles.clear();
         xpSnapshot.clear();
         attackedNpcTicks.clear();
@@ -136,8 +138,6 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onStatChanged(StatChanged event) {
-        if (!config.autoSubmit()) return;
-
         int key = event.getSkill().ordinal();
         int previous = xpSnapshot.getOrDefault(key, -1);
         if (previous < 0) {
@@ -163,7 +163,6 @@ public class MazeBingoPlugin extends Plugin {
     @Subscribe
     public void onGameTick(GameTick event) {
         currentTick++;
-        if (!config.autoSubmit()) return;
         Player local = client.getLocalPlayer();
         if (local == null) return;
         Actor target = local.getInteracting();
@@ -174,7 +173,6 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onNpcDespawned(NpcDespawned event) {
-        if (!config.autoSubmit()) return;
         NPC npc = event.getNpc();
         Integer lastAttackTick = attackedNpcTicks.remove(npc.getIndex());
         if (lastAttackTick == null) return;
@@ -194,7 +192,6 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onItemContainerChanged(ItemContainerChanged event) {
-        if (!config.autoSubmit()) return;
         if (event.getContainerId() != InventoryID.INVENTORY.getId()) return;
 
         Item[] current = event.getItemContainer().getItems();

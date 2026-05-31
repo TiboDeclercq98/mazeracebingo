@@ -267,7 +267,9 @@ public class MazeBingoPlugin extends Plugin {
             }
 
             int req = t.completionsRequired > 0 ? t.completionsRequired : 1;
-            newActive.add(new ActiveTile(t.id, i, t.taskType, t.taskConfig,
+            JsonObject cfg = (t.taskConfig != null && t.taskConfig.isJsonObject())
+                ? t.taskConfig.getAsJsonObject() : null;
+            newActive.add(new ActiveTile(t.id, i, t.taskType, cfg,
                 t.completionsDone, req, desc));
         }
 

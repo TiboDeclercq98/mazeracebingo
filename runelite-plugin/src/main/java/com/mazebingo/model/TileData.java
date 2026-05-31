@@ -1,6 +1,6 @@
 package com.mazebingo.model;
 
-import com.google.gson.JsonObject;
+import com.google.gson.JsonElement;
 
 public class TileData {
     public int id;
@@ -8,5 +8,5 @@ public class TileData {
     public int completionsDone;
     public int completionsRequired;
     public String taskType;
-    public JsonObject taskConfig;
+    public JsonElement taskConfig;
 }

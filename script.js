@@ -61,9 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
         state.tiles.forEach((t, i) => { if (t.completed) completed.add(i); });
         const startIdx = (state.size - 1) * state.size + Math.floor(state.size / 2);
         const endIdx = Math.floor(state.size / 2);
-        // Reveal START and END
+        // Reveal START always; END is revealed only when a completed neighbour uncovers it
         revealed.add(startIdx);
-        revealed.add(endIdx);
         // Game over: reveal the entire maze
         if (state.gameOver) {
             state.tiles.forEach((_, i) => revealed.add(i));
@@ -229,10 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // --- REWORKED OVERVIEW PANEL LOGIC ---
-        // Find all revealed but uncompleted tiles (excluding START/END)
+        // Find all revealed but uncompleted tiles
         const revealedUncompleted = new Set();
         for (let idx = 0; idx < state.tiles.length; idx++) {
-            if (idx === startIdx || idx === endIdx) continue;
             const tile = state.tiles[idx];
             if (tile.completed) continue;
             if (revealed.has(idx)) revealedUncompleted.add(idx);

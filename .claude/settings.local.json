@@ -42,7 +42,8 @@
       "PowerShell($pg = Get-Command pg_ctl -ErrorAction SilentlyContinue; if \\($pg\\) { $pg.Source } else { \"pg_ctl not found\" }; $psql = Get-Command psql -ErrorAction SilentlyContinue; if \\($psql\\) { $psql.Source } else { \"psql not found\" })",
       "Read(//c/Program Files/**)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -File)",
-      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object FullName)"
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules\" -and $_.Extension -match \"\\\\.\\(js|ts|vue|html|ejs|css\\)$\" } | Select-Object -ExpandProperty FullName)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

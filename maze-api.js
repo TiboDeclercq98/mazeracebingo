@@ -286,7 +286,7 @@ async function saveTaskDefinitions(team, taskDefinitions) {
 // Returns { success, tile, specialEvent, progress, target, completed } on success,
 // or { error, status } / { success: false, alreadyCompleted, tile, status } on failure.
 async function submitTileProgress(team, id, playerName, amount) {
-  let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions } = await loadMazeFromDb(team);
+  let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
   const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
   const endId   = Math.floor(SIZE / 2) + 1;
   const isStart = id === startId;
@@ -337,8 +337,10 @@ async function submitTileProgress(team, id, playerName, amount) {
         });
         if (candidates.length > 0) {
           const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
-          mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) + 1;
-          specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${mazeState[pickIdx].id} requires extra completion` };
+          const pickedTile = mazeState[pickIdx];
+          const trapIncrement = taskDefinitions[pickedTile.id]?.taskConfig?.target || 1;
+          pickedTile.completionsRequired = (pickedTile.completionsRequired || 1) + trapIncrement;
+          specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${pickedTile.id} requires extra completion` };
         }
       }
 

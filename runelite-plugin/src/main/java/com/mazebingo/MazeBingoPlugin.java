@@ -2,6 +2,8 @@ package com.mazebingo;
 
 import com.google.gson.JsonObject;
 import com.mazebingo.model.MazeState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
 import net.runelite.api.Actor;
@@ -50,6 +52,7 @@ import java.util.stream.Collectors;
 )
 public class MazeBingoPlugin extends Plugin {
 
+    private static final Logger log = LoggerFactory.getLogger(MazeBingoPlugin.class);
     private static final int KILL_TICK_WINDOW = 5;
 
     @Inject private Client client;
@@ -252,14 +255,19 @@ public class MazeBingoPlugin extends Plugin {
             return;
         }
 
+        log.info("Maze state: size={}, tiles={}, gameOver={}", state.size, state.tiles == null ? "null" : state.tiles.size(), state.gameOver);
+
         Set<Integer> revealed = MazeRevealCalculator.computeRevealed(state);
+        log.info("Revealed indices: {}", revealed);
 
         List<ActiveTile> newActive = new ArrayList<>();
         for (int i = 0; i < state.tiles.size(); i++) {
             TileData t = state.tiles.get(i);
+            if (t == null) { log.info("Tile at index {} is null", i); continue; }
             if (t.completed) continue;
             if (!revealed.contains(i)) continue;
-            if (t.taskType == null) continue;
+            if (t.taskType == null) { log.info("Tile {} (index {}) skipped: taskType is null", t.id, i); continue; }
+            log.info("Adding tile {} (index {}), taskType={}", t.id, i, t.taskType);
 
             String desc = "";
             if (state.tileDescriptions != null) {

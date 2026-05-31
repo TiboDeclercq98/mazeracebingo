@@ -1,0 +1,39 @@
+package com.mazebingo;
+
+import net.runelite.client.config.Config;
+import net.runelite.client.config.ConfigGroup;
+import net.runelite.client.config.ConfigItem;
+
+@ConfigGroup("mazebingo")
+public interface MazeBingoConfig extends Config {
+
+    @ConfigItem(
+        keyName = "apiUrl",
+        name = "API URL",
+        description = "Base URL of the Maze Bingo API",
+        position = 0
+    )
+    default String apiUrl() {
+        return "https://mazeracebingo.onrender.com";
+    }
+
+    @ConfigItem(
+        keyName = "teamName",
+        name = "Team Name",
+        description = "Your team identifier (matches the ?team= parameter on the website)",
+        position = 1
+    )
+    default String teamName() {
+        return "";
+    }
+
+    @ConfigItem(
+        keyName = "autoSubmit",
+        name = "Auto Submit",
+        description = "Automatically submit progress when tasks are detected in-game",
+        position = 2
+    )
+    default boolean autoSubmit() {
+        return true;
+    }
+}

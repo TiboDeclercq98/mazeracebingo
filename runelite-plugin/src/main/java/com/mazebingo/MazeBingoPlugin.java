@@ -4,8 +4,6 @@ import com.google.gson.JsonObject;
 import com.mazebingo.model.MazeState;
 import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
@@ -45,7 +43,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-@Slf4j
 @PluginDescriptor(
     name = "Maze Bingo",
     description = "Automatically tracks task progress for Maze Race Bingo",
@@ -62,8 +59,9 @@ public class MazeBingoPlugin extends Plugin {
     @Inject private ClientToolbar clientToolbar;
     @Inject private ItemManager itemManager;
 
-    @Getter
     private final List<ActiveTile> activeTiles = new CopyOnWriteArrayList<>();
+
+    public List<ActiveTile> getActiveTiles() { return activeTiles; }
 
     // Keyed by Skill.ordinal() — ConcurrentHashMap since event handlers run on client thread
     // but snapshotXp() can be called from executor thread

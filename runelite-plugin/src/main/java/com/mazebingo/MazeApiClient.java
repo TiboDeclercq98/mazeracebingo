@@ -4,15 +4,17 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.mazebingo.model.MazeState;
 import com.mazebingo.model.ProgressResponse;
-import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-@Slf4j
 @Singleton
 public class MazeApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(MazeApiClient.class);
 
     private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8");
 

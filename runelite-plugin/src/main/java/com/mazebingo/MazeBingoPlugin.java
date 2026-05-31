@@ -4,8 +4,6 @@ import com.google.gson.JsonObject;
 import com.mazebingo.model.MazeState;
 import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
-import com.mazebingo.model.WallEntry;
-import com.mazebingo.model.WallSides;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
@@ -35,7 +33,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -257,7 +254,7 @@ public class MazeBingoPlugin extends Plugin {
             return;
         }
 
-        Set<Integer> revealed = computeRevealed(state);
+        Set<Integer> revealed = MazeRevealCalculator.computeRevealed(state);
 
         List<ActiveTile> newActive = new ArrayList<>();
         for (int i = 0; i < state.tiles.size(); i++) {
@@ -293,73 +290,6 @@ public class MazeBingoPlugin extends Plugin {
             .filter(t -> taskType.equals(t.taskType))
             .filter(t -> t.taskConfig != null && configMatcher.test(t.taskConfig))
             .collect(Collectors.toList());
-    }
-
-    // Mirrors the reveal logic in script.js lines 59-126
-    private Set<Integer> computeRevealed(MazeState state) {
-        int size = state.size;
-        Set<Integer> completed = new HashSet<>();
-        Set<Integer> revealed = new HashSet<>();
-
-        for (int i = 0; i < state.tiles.size(); i++) {
-            if (state.tiles.get(i).completed) completed.add(i);
-        }
-
-        int startIdx = (size - 1) * size + size / 2;
-        revealed.add(startIdx);
-
-        if (state.gameOver) {
-            for (int i = 0; i < state.tiles.size(); i++) revealed.add(i);
-            return revealed;
-        }
-
-        for (int idx : completed) {
-            revealed.add(idx);
-            int row = idx / size;
-            int col = idx % size;
-            WallSides w = getWallSides(state, row, col);
-
-            if (row > 0) {
-                WallSides nw = getWallSides(state, row - 1, col);
-                if (isOpenV(w, false, nw, true)) revealed.add((row - 1) * size + col);
-            }
-            if (row < size - 1) {
-                WallSides nw = getWallSides(state, row + 1, col);
-                if (isOpenV(w, true, nw, false)) revealed.add((row + 1) * size + col);
-            }
-            if (col > 0) {
-                WallSides nw = getWallSides(state, row, col - 1);
-                if (isOpenH(w, false, nw, true)) revealed.add(row * size + (col - 1));
-            }
-            if (col < size - 1) {
-                WallSides nw = getWallSides(state, row, col + 1);
-                if (isOpenH(w, true, nw, false)) revealed.add(row * size + (col + 1));
-            }
-        }
-
-        return revealed;
-    }
-
-    /** Vertical passage check: aBottom=true means we're checking the bottom wall of tile A. */
-    private boolean isOpenV(WallSides a, boolean aBottom, WallSides b, boolean bBottom) {
-        boolean aBlocked = a != null && (aBottom ? a.bottom : a.top);
-        boolean bBlocked = b != null && (bBottom ? b.bottom : b.top);
-        return !aBlocked && !bBlocked;
-    }
-
-    /** Horizontal passage check: aRight=true means we're checking the right wall of tile A. */
-    private boolean isOpenH(WallSides a, boolean aRight, WallSides b, boolean bRight) {
-        boolean aBlocked = a != null && (aRight ? a.right : a.left);
-        boolean bBlocked = b != null && (bRight ? b.right : b.left);
-        return !aBlocked && !bBlocked;
-    }
-
-    private WallSides getWallSides(MazeState state, int row, int col) {
-        if (state.walls == null) return null;
-        for (WallEntry entry : state.walls) {
-            if (entry.row == row && entry.col == col) return entry.walls;
-        }
-        return null;
     }
 
     private static Map<Integer, Integer> toItemMap(Item[] items) {

@@ -8,18 +8,17 @@ import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.gameval.InventoryID;
-import net.runelite.api.Item;
 import net.runelite.api.NPC;
 import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
-import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.StatChanged;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStack;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -72,8 +71,6 @@ public class MazeBingoPlugin extends Plugin {
     // NPC kill tracking: npcIndex → NPC reference for every NPC the player has hit
     private final Map<Integer, NPC> attackedNpcs = new HashMap<>();
 
-    // Item drop tracking: previous inventory state
-    private Item[] previousInventory = null;
 
     private ScheduledExecutorService executor;
     private ScheduledFuture<?> pollTask;
@@ -113,7 +110,6 @@ public class MazeBingoPlugin extends Plugin {
         activeTiles.clear();
         xpSnapshot.clear();
         attackedNpcs.clear();
-        previousInventory = null;
         panel.clear();
     }
 
@@ -127,7 +123,6 @@ public class MazeBingoPlugin extends Plugin {
             activeTiles.clear();
             xpSnapshot.clear();
             attackedNpcs.clear();
-            previousInventory = null;
             panel.clear();
         }
     }
@@ -210,29 +205,13 @@ public class MazeBingoPlugin extends Plugin {
     // --- Item drops ---
 
     @Subscribe
-    public void onItemContainerChanged(ItemContainerChanged event) {
-        if (event.getContainerId() != InventoryID.INV) return;
-
-        Item[] current = event.getItemContainer().getItems();
-        if (previousInventory == null) {
-            previousInventory = current.clone();
-            return;
-        }
-
-        Map<Integer, Integer> before = toItemMap(previousInventory);
-        Map<Integer, Integer> after = toItemMap(current);
-        previousInventory = current.clone();
-
-        for (Map.Entry<Integer, Integer> entry : after.entrySet()) {
-            int itemId = entry.getKey();
-            int gained = entry.getValue() - before.getOrDefault(itemId, 0);
-            if (gained <= 0) continue;
-
-            String itemName = itemManager.getItemComposition(itemId).getName();
+    public void onNpcLootReceived(NpcLootReceived event) {
+        for (ItemStack stack : event.getItems()) {
+            String itemName = itemManager.getItemComposition(stack.getId()).getName();
             List<ActiveTile> matches = matchingTiles("item_drop", cfg ->
                 cfg.has("item") && itemName.equalsIgnoreCase(cfg.get("item").getAsString()));
             for (ActiveTile tile : matches) {
-                submitProgress(tile, gained);
+                submitProgress(tile, stack.getQuantity());
             }
         }
     }
@@ -327,16 +306,6 @@ public class MazeBingoPlugin extends Plugin {
             .filter(t -> taskType.equals(t.taskType))
             .filter(t -> t.taskConfig != null && configMatcher.test(t.taskConfig))
             .collect(Collectors.toList());
-    }
-
-    private static Map<Integer, Integer> toItemMap(Item[] items) {
-        Map<Integer, Integer> map = new HashMap<>();
-        for (Item item : items) {
-            if (item.getId() >= 0) {
-                map.merge(item.getId(), item.getQuantity(), Integer::sum);
-            }
-        }
-        return map;
     }
 
     @Provides

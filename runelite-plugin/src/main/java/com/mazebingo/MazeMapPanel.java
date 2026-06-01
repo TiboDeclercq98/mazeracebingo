@@ -11,7 +11,7 @@ import java.util.Set;
 
 class MazeMapPanel extends JPanel {
 
-    private static final int CELL = 20;
+    private static final int CELL = 22;
     private static final int PADDING = 5;
 
     private static final Color COLOR_COMPLETED = new Color(76, 175, 80);
@@ -95,7 +95,7 @@ class MazeMapPanel extends JPanel {
         }
 
         // Tile IDs for revealed tiles
-        g2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 8));
+        g2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 10));
         FontMetrics fm = g2.getFontMetrics();
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {

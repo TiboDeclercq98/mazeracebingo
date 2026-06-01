@@ -10,7 +10,7 @@ public interface MazeBingoConfig extends Config {
     @ConfigItem(
         keyName = "apiUrl",
         name = "API URL",
-        description = "Base URL of the Maze Bingo API",
+        description = "Base URL of the Maze Race Bingo API",
         position = 0
     )
     default String apiUrl() {

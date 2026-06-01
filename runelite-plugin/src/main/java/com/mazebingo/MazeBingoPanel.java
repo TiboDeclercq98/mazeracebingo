@@ -25,7 +25,7 @@ public class MazeBingoPanel extends PluginPanel {
         setBorder(new EmptyBorder(10, 10, 10, 10));
         setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-        JLabel title = new JLabel("Maze Bingo");
+        JLabel title = new JLabel("Maze Race Bingo");
         title.setFont(FontManager.getRunescapeBoldFont());
         title.setForeground(Color.WHITE);
 

@@ -1,4 +1,4 @@
-// Express API for Maze Bingo
+// Express API for Maze Race Bingo
 // npm install express canvas cors pg playwright
 
 const express = require('express');

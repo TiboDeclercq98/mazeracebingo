@@ -46,9 +46,9 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @PluginDescriptor(
-    name = "Maze Bingo",
+    name = "Maze Race Bingo",
     description = "Automatically tracks task progress for Maze Race Bingo",
-    tags = {"maze", "bingo", "tracker", "task"}
+    tags = {"maze", "race", "bingo", "tracker", "task"}
 )
 public class MazeBingoPlugin extends Plugin {
 
@@ -87,7 +87,7 @@ public class MazeBingoPlugin extends Plugin {
         panel.setOnRefresh(() -> executor.execute(this::refreshMazeState));
 
         navButton = NavigationButton.builder()
-            .tooltip("Maze Bingo")
+            .tooltip("Maze Race Bingo")
             .icon(buildIcon())
             .priority(5)
             .panel(panel)
@@ -176,13 +176,19 @@ public class MazeBingoPlugin extends Plugin {
         NPC npc = event.getNpc();
         Integer lastAttackTick = attackedNpcTicks.remove(npc.getIndex());
         if (lastAttackTick == null) return;
-        if (currentTick - lastAttackTick > KILL_TICK_WINDOW) return;
+        int tickDiff = currentTick - lastAttackTick;
+        if (tickDiff > KILL_TICK_WINDOW) {
+            log.info("Kill ignored: '{}' tickDiff={} > window={}", npc.getName(), tickDiff, KILL_TICK_WINDOW);
+            return;
+        }
 
         String npcName = npc.getName();
         if (npcName == null) return;
 
+        log.info("Kill detected: npcName='{}' tickDiff={}", npcName, tickDiff);
         List<ActiveTile> matches = matchingTiles("npc_kill", cfg ->
             cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
+        log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
         for (ActiveTile tile : matches) {
             submitProgress(tile, 1);
         }
@@ -231,7 +237,12 @@ public class MazeBingoPlugin extends Plugin {
 
         executor.execute(() -> {
             ProgressResponse response = apiClient.postProgress(apiUrl, tile.id, playerName, amount, team);
-if (response != null && response.completed) {
+            if (response == null) {
+                log.warn("Progress submit for tile {} returned null (API error)", tile.id);
+                return;
+            }
+            log.info("Progress tile {}: progress={}/{} completed={}", tile.id, response.progress, response.target, response.completed);
+            if (response.completed) {
                 refreshMazeState();
             }
         });

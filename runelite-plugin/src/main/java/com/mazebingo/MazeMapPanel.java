@@ -20,7 +20,7 @@ class MazeMapPanel extends JPanel {
     private static final Color COLOR_GRID       = new Color(45, 45, 45);
     private static final Color COLOR_START      = new Color(255, 215, 0);
     private static final Color COLOR_END        = new Color(200, 50, 50);
-    private static final Color COLOR_WALL       = Color.BLACK;
+    private static final Color COLOR_WALL       = new Color(230, 230, 230);
 
     private MazeState state;
     private Set<Integer> revealed;

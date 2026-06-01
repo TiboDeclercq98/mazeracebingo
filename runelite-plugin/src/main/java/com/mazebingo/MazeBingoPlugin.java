@@ -255,6 +255,16 @@ public class MazeBingoPlugin extends Plugin {
                 return;
             }
             log.info("Progress tile {}: progress={}/{} completed={}", tile.id, response.progress, response.target, response.completed);
+            for (int i = 0; i < activeTiles.size(); i++) {
+                ActiveTile t = activeTiles.get(i);
+                if (t.id == tile.id) {
+                    activeTiles.set(i, new ActiveTile(
+                        t.id, t.tileIndex, t.taskType, t.taskConfig,
+                        response.progress, response.target, t.description));
+                    break;
+                }
+            }
+            panel.updateTiles(activeTiles);
             refreshMazeState();
         });
     }

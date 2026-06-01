@@ -183,8 +183,21 @@ public class MazeBingoPlugin extends Plugin {
             List<ActiveTile> matches = matchingTiles("npc_kill", cfg ->
                 cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
             log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
-            for (ActiveTile tile : matches) {
-                submitProgress(tile, 1);
+            if (matches.isEmpty()) {
+                // Tile may have just been revealed but not yet loaded — refresh and retry once
+                executor.execute(() -> {
+                    refreshMazeState();
+                    List<ActiveTile> retry = matchingTiles("npc_kill", cfg ->
+                        cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
+                    log.info("Retry matched {} tile(s) for npc_kill '{}'", retry.size(), npcName);
+                    for (ActiveTile tile : retry) {
+                        submitProgress(tile, 1);
+                    }
+                });
+            } else {
+                for (ActiveTile tile : matches) {
+                    submitProgress(tile, 1);
+                }
             }
         }
     }
@@ -242,9 +255,7 @@ public class MazeBingoPlugin extends Plugin {
                 return;
             }
             log.info("Progress tile {}: progress={}/{} completed={}", tile.id, response.progress, response.target, response.completed);
-            if (response.completed) {
-                refreshMazeState();
-            }
+            refreshMazeState();
         });
     }
 

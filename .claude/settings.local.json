@@ -56,7 +56,12 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -Filter \"*.java\")",
       "Bash(Sort-Object FullName)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -Directory -ErrorAction SilentlyContinue)",
-      "Bash(dir \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\")"
+      "Bash(dir \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -Force)",
+      "Bash(Select-Object -First 100)",
+      "Bash(Format-Table FullName)",
+      "Bash(cd \"/c/Users/Tibo Declercq/Documents/Maze Bingo\" && find . -type f -name \"*.java\" -o -name \"*.gradle\" -o -name \"*.xml\" -o -name \"*.json\" -o -name \"*.md\" | head -50)",
+      "Read(//c/c/Users/Tibo Declercq/Documents/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

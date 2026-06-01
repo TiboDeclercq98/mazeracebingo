@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.mazebingo.model.MazeState;
 import com.mazebingo.model.ProgressResponse;
+import com.mazebingo.model.TileProgressResponse;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,25 @@ public class MazeApiClient {
             return gson.fromJson(response.body().charStream(), ProgressResponse.class);
         } catch (Exception e) {
             log.warn("Failed to post progress for tile {}", tileId, e);
+            return null;
+        }
+    }
+
+    public TileProgressResponse fetchTileProgress(String apiUrl, int tileId, String team) {
+        HttpUrl url = HttpUrl.parse(apiUrl + "/api/tiles/progress/" + tileId)
+            .newBuilder()
+            .addQueryParameter("team", team)
+            .build();
+
+        Request request = new Request.Builder().url(url).get().build();
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful() || response.body() == null) {
+                log.warn("Tile progress GET for tile {} returned {}", tileId, response.code());
+                return null;
+            }
+            return gson.fromJson(response.body().charStream(), TileProgressResponse.class);
+        } catch (Exception e) {
+            log.warn("Failed to fetch tile progress for tile {}", tileId, e);
             return null;
         }
     }

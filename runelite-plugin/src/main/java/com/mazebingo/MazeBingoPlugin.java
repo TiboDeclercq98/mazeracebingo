@@ -2,6 +2,7 @@ package com.mazebingo;
 
 import com.google.gson.JsonObject;
 import com.mazebingo.model.MazeState;
+import com.mazebingo.model.TileProgressResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.mazebingo.model.ProgressResponse;
@@ -61,6 +62,7 @@ public class MazeBingoPlugin extends Plugin {
     @Inject private ItemManager itemManager;
 
     private final List<ActiveTile> activeTiles = new CopyOnWriteArrayList<>();
+    private volatile Map<String, String> tileDescriptions = new HashMap<>();
 
     public List<ActiveTile> getActiveTiles() { return activeTiles; }
 
@@ -80,6 +82,18 @@ public class MazeBingoPlugin extends Plugin {
     protected void startUp() {
         executor = Executors.newSingleThreadScheduledExecutor();
         panel.setOnRefresh(() -> executor.execute(this::refreshMazeState));
+        panel.setOnTileClick(tile -> {
+            String desc = tileDescriptions.getOrDefault(String.valueOf(tile.id), "");
+            panel.showTileInfoLoading(tile.id, desc);
+            String apiUrl = config.apiUrl();
+            String team = config.teamName();
+            executor.execute(() -> {
+                TileProgressResponse resp = apiClient.fetchTileProgress(apiUrl, tile.id, team);
+                if (resp != null) {
+                    panel.showTileInfo(resp, desc);
+                }
+            });
+        });
 
         navButton = NavigationButton.builder()
             .tooltip("Maze Race Bingo")
@@ -263,6 +277,10 @@ public class MazeBingoPlugin extends Plugin {
         }
 
         log.info("Maze state: size={}, tiles={}, gameOver={}", state.size, state.tiles == null ? "null" : state.tiles.size(), state.gameOver);
+
+        if (state.tileDescriptions != null) {
+            tileDescriptions = state.tileDescriptions;
+        }
 
         Set<Integer> revealed = MazeRevealCalculator.computeRevealed(state);
         log.info("Revealed indices: {}", revealed);

@@ -1,6 +1,8 @@
 package com.mazebingo;
 
 import com.mazebingo.model.MazeState;
+import com.mazebingo.model.TileData;
+import com.mazebingo.model.TileProgressResponse;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
@@ -11,12 +13,14 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class MazeBingoPanel extends PluginPanel {
 
     private final JLabel statusLabel;
     private final JPanel tilesPanel;
     private final MazeMapPanel mazeMapPanel;
+    private final TileInfoPanel tileInfoPanel;
     private Runnable onRefresh;
 
     @Inject
@@ -53,6 +57,7 @@ public class MazeBingoPanel extends PluginPanel {
         headerPanel.add(statusLabel, BorderLayout.SOUTH);
 
         mazeMapPanel = new MazeMapPanel();
+        tileInfoPanel = new TileInfoPanel();
 
         tilesPanel = new JPanel();
         tilesPanel.setLayout(new BoxLayout(tilesPanel, BoxLayout.Y_AXIS));
@@ -67,6 +72,7 @@ public class MazeBingoPanel extends PluginPanel {
         content.add(headerPanel);
         content.add(mazeMapPanel);
         content.add(Box.createRigidArea(new Dimension(0, 6)));
+        content.add(tileInfoPanel);
         content.add(tilesPanel);
 
         add(content, BorderLayout.NORTH);
@@ -81,6 +87,18 @@ public class MazeBingoPanel extends PluginPanel {
 
     void setOnRefresh(Runnable callback) {
         this.onRefresh = callback;
+    }
+
+    void setOnTileClick(Consumer<TileData> callback) {
+        mazeMapPanel.setOnTileClick(callback);
+    }
+
+    void showTileInfoLoading(int tileId, String description) {
+        SwingUtilities.invokeLater(() -> tileInfoPanel.showLoading(tileId, description));
+    }
+
+    void showTileInfo(TileProgressResponse data, String description) {
+        SwingUtilities.invokeLater(() -> tileInfoPanel.showTile(data, description));
     }
 
     void setStatus(String message) {
@@ -116,6 +134,7 @@ public class MazeBingoPanel extends PluginPanel {
             tilesPanel.removeAll();
             tilesPanel.revalidate();
             tilesPanel.repaint();
+            tileInfoPanel.clear();
             statusLabel.setText("● Not connected");
             statusLabel.setForeground(Color.RED);
         });

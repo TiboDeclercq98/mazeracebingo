@@ -7,11 +7,14 @@ import com.mazebingo.model.WallSides;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.Set;
+import java.util.function.Consumer;
 
 class MazeMapPanel extends JPanel {
 
-    private static final int CELL = 22;
+    private static final int CELL = 23;
     private static final int PADDING = 5;
 
     private static final Color COLOR_COMPLETED = new Color(76, 175, 80);
@@ -24,6 +27,7 @@ class MazeMapPanel extends JPanel {
 
     private MazeState state;
     private Set<Integer> revealed;
+    private Consumer<TileData> onTileClick;
 
     MazeMapPanel() {
         setBackground(new Color(30, 30, 30));
@@ -31,6 +35,30 @@ class MazeMapPanel extends JPanel {
         setPreferredSize(new Dimension(dim, dim));
         setMaximumSize(new Dimension(dim, dim));
         setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (onTileClick == null || state == null || state.tiles == null) return;
+                int relX = e.getX() - PADDING;
+                int relY = e.getY() - PADDING;
+                if (relX < 0 || relY < 0) return;
+                int col = relX / CELL;
+                int row = relY / CELL;
+                int size = state.size;
+                if (col >= size || row >= size) return;
+                int idx = row * size + col;
+                if (idx == size / 2) return; // END tile
+                if (revealed == null || !revealed.contains(idx)) return;
+                TileData tile = idx < state.tiles.size() ? state.tiles.get(idx) : null;
+                if (tile == null) return;
+                onTileClick.accept(tile);
+            }
+        });
+    }
+
+    void setOnTileClick(Consumer<TileData> callback) {
+        this.onTileClick = callback;
     }
 
     void updateState(MazeState state, Set<Integer> revealed) {

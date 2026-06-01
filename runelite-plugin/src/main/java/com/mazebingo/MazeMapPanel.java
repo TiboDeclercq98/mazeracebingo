@@ -11,8 +11,8 @@ import java.util.Set;
 
 class MazeMapPanel extends JPanel {
 
-    private static final int CELL = 28;
-    private static final int PADDING = 10;
+    private static final int CELL = 20;
+    private static final int PADDING = 5;
 
     private static final Color COLOR_COMPLETED = new Color(76, 175, 80);
     private static final Color COLOR_REVEALED   = new Color(55, 58, 60);
@@ -22,22 +22,40 @@ class MazeMapPanel extends JPanel {
     private static final Color COLOR_END        = new Color(200, 50, 50);
     private static final Color COLOR_WALL       = Color.BLACK;
 
-    private final MazeState state;
-    private final Set<Integer> revealed;
+    private MazeState state;
+    private Set<Integer> revealed;
 
-    MazeMapPanel(MazeState state, Set<Integer> revealed) {
+    MazeMapPanel() {
+        setBackground(new Color(30, 30, 30));
+        int dim = 9 * CELL + PADDING * 2;
+        setPreferredSize(new Dimension(dim, dim));
+        setMaximumSize(new Dimension(dim, dim));
+        setAlignmentX(Component.LEFT_ALIGNMENT);
+    }
+
+    void updateState(MazeState state, Set<Integer> revealed) {
         this.state = state;
         this.revealed = revealed;
-        int size = state != null ? state.size : 9;
-        int dim = size * CELL + PADDING * 2;
-        setBackground(new Color(30, 30, 30));
-        setPreferredSize(new Dimension(dim, dim));
+        if (state != null) {
+            int dim = state.size * CELL + PADDING * 2;
+            setPreferredSize(new Dimension(dim, dim));
+            setMaximumSize(new Dimension(dim, dim));
+            revalidate();
+        }
+        repaint();
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (state == null || state.tiles == null) return;
+        if (state == null || state.tiles == null) {
+            g.setColor(new Color(100, 100, 100));
+            g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 10));
+            String msg = "No maze data";
+            FontMetrics fm = g.getFontMetrics();
+            g.drawString(msg, (getWidth() - fm.stringWidth(msg)) / 2, getHeight() / 2);
+            return;
+        }
 
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -58,10 +76,10 @@ class MazeMapPanel extends JPanel {
                 boolean vis  = revealed != null && revealed.contains(idx);
 
                 Color fill;
-                if (done)          fill = COLOR_COMPLETED;
+                if (done)               fill = COLOR_COMPLETED;
                 else if (idx == endIdx) fill = COLOR_END;
-                else if (vis)      fill = COLOR_REVEALED;
-                else               fill = COLOR_HIDDEN;
+                else if (vis)           fill = COLOR_REVEALED;
+                else                    fill = COLOR_HIDDEN;
                 g2.setColor(fill);
                 g2.fillRect(x, y, CELL, CELL);
             }
@@ -77,7 +95,7 @@ class MazeMapPanel extends JPanel {
         }
 
         // Tile IDs for revealed tiles
-        g2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 9));
+        g2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 8));
         FontMetrics fm = g2.getFontMetrics();
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {

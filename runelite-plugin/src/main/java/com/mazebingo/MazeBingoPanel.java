@@ -16,8 +16,8 @@ public class MazeBingoPanel extends PluginPanel {
 
     private final JLabel statusLabel;
     private final JPanel tilesPanel;
+    private final MazeMapPanel mazeMapPanel;
     private Runnable onRefresh;
-    private volatile MazeState currentMazeState;
 
     @Inject
     MazeBingoPanel() {
@@ -47,54 +47,36 @@ public class MazeBingoPanel extends PluginPanel {
 
         JPanel headerPanel = new JPanel(new BorderLayout(0, 2));
         headerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        headerPanel.setBorder(new EmptyBorder(0, 0, 6, 0));
+        headerPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         headerPanel.add(topRow, BorderLayout.NORTH);
         headerPanel.add(statusLabel, BorderLayout.SOUTH);
 
-        JButton viewMazeButton = new JButton("View Maze");
-        viewMazeButton.setFont(FontManager.getRunescapeSmallFont());
-        viewMazeButton.setFocusPainted(false);
-        viewMazeButton.addActionListener(e -> openMazeMap());
-
-        JPanel topSection = new JPanel(new BorderLayout(0, 4));
-        topSection.setBackground(ColorScheme.DARK_GRAY_COLOR);
-        topSection.setBorder(new EmptyBorder(0, 0, 6, 0));
-        topSection.add(headerPanel, BorderLayout.NORTH);
-        topSection.add(viewMazeButton, BorderLayout.SOUTH);
+        mazeMapPanel = new MazeMapPanel();
 
         tilesPanel = new JPanel();
         tilesPanel.setLayout(new BoxLayout(tilesPanel, BoxLayout.Y_AXIS));
         tilesPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        tilesPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         tilesPanel.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR), "Active Tasks"));
 
         JPanel content = new JPanel();
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBackground(ColorScheme.DARK_GRAY_COLOR);
-        content.add(topSection);
+        content.add(headerPanel);
+        content.add(mazeMapPanel);
+        content.add(Box.createRigidArea(new Dimension(0, 6)));
         content.add(tilesPanel);
 
         add(content, BorderLayout.NORTH);
     }
 
     void updateMazeState(MazeState state) {
-        this.currentMazeState = state;
-    }
-
-    private void openMazeMap() {
-        MazeState snapshot = currentMazeState;
-        if (snapshot == null) {
-            JOptionPane.showMessageDialog(this, "No maze data available yet.", "Maze Map", JOptionPane.INFORMATION_MESSAGE);
-            return;
+        if (state != null) {
+            Set<Integer> revealed = MazeRevealCalculator.computeRevealed(state);
+            SwingUtilities.invokeLater(() -> mazeMapPanel.updateState(state, revealed));
         }
-        Set<Integer> revealed = MazeRevealCalculator.computeRevealed(snapshot);
-        MazeMapPanel mapPanel = new MazeMapPanel(snapshot, revealed);
-
-        JFrame frame = new JFrame("Maze Map");
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        frame.setContentPane(mapPanel);
-        frame.pack();
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
     }
 
     void setOnRefresh(Runnable callback) {

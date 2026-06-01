@@ -6,16 +6,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
-import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.InventoryID;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.NPC;
-import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.StatChanged;
@@ -33,6 +32,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +53,6 @@ import java.util.stream.Collectors;
 public class MazeBingoPlugin extends Plugin {
 
     private static final Logger log = LoggerFactory.getLogger(MazeBingoPlugin.class);
-    private static final int KILL_TICK_WINDOW = 5;
 
     @Inject private Client client;
     @Inject private MazeBingoConfig config;
@@ -70,9 +69,8 @@ public class MazeBingoPlugin extends Plugin {
     // but snapshotXp() can be called from executor thread
     private final Map<Integer, Integer> xpSnapshot = new ConcurrentHashMap<>();
 
-    // NPC kill tracking: npcIndex → game tick on which we last attacked it
-    private final Map<Integer, Integer> attackedNpcTicks = new HashMap<>();
-    private int currentTick = 0;
+    // NPC kill tracking: npcIndex → NPC reference for every NPC the player has hit
+    private final Map<Integer, NPC> attackedNpcs = new HashMap<>();
 
     // Item drop tracking: previous inventory state
     private Item[] previousInventory = null;
@@ -114,7 +112,7 @@ public class MazeBingoPlugin extends Plugin {
         panel.setOnRefresh(null);
         activeTiles.clear();
         xpSnapshot.clear();
-        attackedNpcTicks.clear();
+        attackedNpcs.clear();
         previousInventory = null;
         panel.clear();
     }
@@ -128,7 +126,7 @@ public class MazeBingoPlugin extends Plugin {
             || event.getGameState() == GameState.HOPPING) {
             activeTiles.clear();
             xpSnapshot.clear();
-            attackedNpcTicks.clear();
+            attackedNpcs.clear();
             previousInventory = null;
             panel.clear();
         }
@@ -161,44 +159,46 @@ public class MazeBingoPlugin extends Plugin {
     // --- NPC kills ---
 
     @Subscribe
+    public void onHitsplatApplied(HitsplatApplied event) {
+        if (!(event.getActor() instanceof NPC)) return;
+        if (!event.getHitsplat().isMine()) return;
+        NPC npc = (NPC) event.getActor();
+        attackedNpcs.put(npc.getIndex(), npc);
+    }
+
+    @Subscribe
     public void onGameTick(GameTick event) {
-        currentTick++;
-        Player local = client.getLocalPlayer();
-        if (local == null) return;
-        Actor target = local.getInteracting();
-        if (target instanceof NPC) {
-            attackedNpcTicks.put(((NPC) target).getIndex(), currentTick);
+        checkDeadNpcs();
+    }
+
+    private void checkDeadNpcs() {
+        Iterator<Map.Entry<Integer, NPC>> it = attackedNpcs.entrySet().iterator();
+        while (it.hasNext()) {
+            NPC npc = it.next().getValue();
+            if (!npc.isDead()) continue;
+            it.remove();
+            String npcName = npc.getName();
+            if (npcName == null) continue;
+            log.info("Kill detected: npcName='{}'", npcName);
+            List<ActiveTile> matches = matchingTiles("npc_kill", cfg ->
+                cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
+            log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
+            for (ActiveTile tile : matches) {
+                submitProgress(tile, 1);
+            }
         }
     }
 
     @Subscribe
     public void onNpcDespawned(NpcDespawned event) {
-        NPC npc = event.getNpc();
-        Integer lastAttackTick = attackedNpcTicks.remove(npc.getIndex());
-        if (lastAttackTick == null) return;
-        int tickDiff = currentTick - lastAttackTick;
-        if (tickDiff > KILL_TICK_WINDOW) {
-            log.info("Kill ignored: '{}' tickDiff={} > window={}", npc.getName(), tickDiff, KILL_TICK_WINDOW);
-            return;
-        }
-
-        String npcName = npc.getName();
-        if (npcName == null) return;
-
-        log.info("Kill detected: npcName='{}' tickDiff={}", npcName, tickDiff);
-        List<ActiveTile> matches = matchingTiles("npc_kill", cfg ->
-            cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
-        log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
-        for (ActiveTile tile : matches) {
-            submitProgress(tile, 1);
-        }
+        attackedNpcs.remove(event.getNpc().getIndex());
     }
 
     // --- Item drops ---
 
     @Subscribe
     public void onItemContainerChanged(ItemContainerChanged event) {
-        if (event.getContainerId() != InventoryID.INVENTORY.getId()) return;
+        if (event.getContainerId() != InventoryID.INV) return;
 
         Item[] current = event.getItemContainer().getItems();
         if (previousInventory == null) {

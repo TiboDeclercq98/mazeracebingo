@@ -6,15 +6,20 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetModalMode;
 import net.runelite.client.audio.AudioPlayer;
 import net.runelite.client.callback.ClientThread;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.awt.Color;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 @Singleton
 public class MazeEventNotificationOverlay {
+
+    private static final Logger log = LoggerFactory.getLogger(MazeEventNotificationOverlay.class);
 
     private static final int RESIZABLE_CLASSIC_LAYOUT = (161 << 16) | 13;
     private static final int RESIZABLE_MODERN_LAYOUT  = (164 << 16) | 13;
@@ -52,10 +57,13 @@ public class MazeEventNotificationOverlay {
                     int gameVolume = client.getPreferences().getSoundEffectVolume();
                     if (gameVolume > 0) {
                         float gain = 20f * (float) Math.log10(gameVolume / 100f);
-                        try {
-                            audioPlayer.play(SoundGenerator.generate(sound), gain);
-                        } catch (Exception ex) {
-                            // ignored
+                        InputStream stream = SoundGenerator.generate(sound);
+                        if (stream != null) {
+                            try {
+                                audioPlayer.play(stream, gain);
+                            } catch (Exception ex) {
+                                log.warn("Failed to play notification sound {}", sound, ex);
+                            }
                         }
                     }
                 }

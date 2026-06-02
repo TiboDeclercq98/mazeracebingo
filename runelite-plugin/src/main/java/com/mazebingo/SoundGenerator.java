@@ -1,5 +1,8 @@
 package com.mazebingo;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,6 +11,7 @@ import java.nio.ByteOrder;
 
 class SoundGenerator {
 
+    private static final Logger log = LoggerFactory.getLogger(SoundGenerator.class);
     private static final int SAMPLE_RATE = 44100;
 
     static InputStream generate(MazeSound sound) {
@@ -23,10 +27,15 @@ class SoundGenerator {
     // Loads a raw 44100 Hz, 16-bit, mono PCM file and wraps it in a WAV header.
     private static InputStream loadPcm(String resource) {
         try (InputStream in = SoundGenerator.class.getResourceAsStream(resource)) {
-            if (in == null) return null;
+            if (in == null) {
+                log.warn("Sound resource not found on classpath: {}", resource);
+                return null;
+            }
             byte[] pcm = in.readAllBytes();
+            log.debug("Loaded PCM resource {} ({} bytes)", resource, pcm.length);
             return new ByteArrayInputStream(wavBytes(pcm));
         } catch (IOException e) {
+            log.warn("Failed to read sound resource {}", resource, e);
             return null;
         }
     }

@@ -2,7 +2,8 @@ package com.mazebingo;
 
 public enum MazeSound {
     NONE("None"),
-    SHORT_DOG_BARK("Short dog bark");
+    SHORT_DOG_BARK("Short dog bark"),
+    WHIP("Whip");
 
     private final String displayName;
 

@@ -17,6 +17,7 @@ class SoundGenerator {
     static InputStream generate(MazeSound sound) {
         switch (sound) {
             case SHORT_DOG_BARK: return loadWav("/com/mazebingo/sounds/short-dog-bark.wav");
+            case WHIP:            return loadWav("/com/mazebingo/sounds/whip.wav");
             default:             return null;
         }
     }

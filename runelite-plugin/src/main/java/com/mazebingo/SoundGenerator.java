@@ -16,24 +16,18 @@ class SoundGenerator {
 
     static InputStream generate(MazeSound sound) {
         switch (sound) {
-            case DING:        return tones(new double[]{880},        new double[]{0.35});
-            case DOUBLE_DING: return tones(new double[]{880, 1100},  new double[]{0.25, 0.30});
-            case CHIME:       return tones(new double[]{523},        new double[]{0.65});
-            case SINGLE_BARK: return loadPcm("/com/mazebingo/sounds/single_bark.pcm");
-            default:          return null;
+            case SHORT_DOG_BARK: return loadWav("/com/mazebingo/sounds/short-dog-bark.wav");
+            default:             return null;
         }
     }
 
-    // Loads a raw 44100 Hz, 16-bit, mono PCM file and wraps it in a WAV header.
-    private static InputStream loadPcm(String resource) {
+    private static InputStream loadWav(String resource) {
         try (InputStream in = SoundGenerator.class.getResourceAsStream(resource)) {
             if (in == null) {
                 log.warn("Sound resource not found on classpath: {}", resource);
                 return null;
             }
-            byte[] pcm = in.readAllBytes();
-            log.debug("Loaded PCM resource {} ({} bytes)", resource, pcm.length);
-            return new ByteArrayInputStream(wavBytes(pcm));
+            return new ByteArrayInputStream(in.readAllBytes());
         } catch (IOException e) {
             log.warn("Failed to read sound resource {}", resource, e);
             return null;

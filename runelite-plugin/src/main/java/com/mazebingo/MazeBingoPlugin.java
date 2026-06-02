@@ -319,6 +319,20 @@ public class MazeBingoPlugin extends Plugin {
             String contrib = amount + (subCategory != null ? " " + subCategory : "") + suffix;
             sendChatMessage("You contributed " + contrib + " to tile " + tile.id + ".");
 
+            if (response.completed) {
+                sendChatMessage("<col=00ff00>You've completed tile " + tile.id + "!</col>");
+            }
+
+            if (response.specialEvent != null && response.specialEvent.isJsonObject()) {
+                JsonObject se = response.specialEvent.getAsJsonObject();
+                if (se.has("message")) {
+                    String seMsg = se.get("message").getAsString();
+                    String seType = se.has("type") ? se.get("type").getAsString() : "";
+                    String seColor = "gameover".equals(seType) ? "ff0000" : "ffcc00";
+                    sendChatMessage("<col=" + seColor + ">" + seMsg + "</col>");
+                }
+            }
+
             for (int i = 0; i < activeTiles.size(); i++) {
                 ActiveTile t = activeTiles.get(i);
                 if (t.id == tile.id) {

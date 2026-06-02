@@ -53,17 +53,14 @@ public class MazeEventNotificationOverlay {
                 client.runScript(3343, "Maze Race Bingo", message, -1);
 
                 MazeSound sound = config.notificationSound();
+                log.info("Notification sound config: {}, gameVolume: {}", sound, client.getPreferences().getSoundEffectVolume());
                 if (sound != MazeSound.NONE) {
-                    int gameVolume = client.getPreferences().getSoundEffectVolume();
-                    if (gameVolume > 0) {
-                        float gain = 20f * (float) Math.log10(gameVolume / 100f);
-                        InputStream stream = SoundGenerator.generate(sound);
-                        if (stream != null) {
-                            try {
-                                audioPlayer.play(stream, gain);
-                            } catch (Exception ex) {
-                                log.warn("Failed to play notification sound {}", sound, ex);
-                            }
+                    InputStream stream = SoundGenerator.generate(sound);
+                    if (stream != null) {
+                        try {
+                            audioPlayer.play(stream, 0f);
+                        } catch (Exception ex) {
+                            log.warn("Failed to play notification sound {}", sound, ex);
                         }
                     }
                 }

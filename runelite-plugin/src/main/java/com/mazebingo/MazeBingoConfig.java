@@ -34,7 +34,7 @@ public interface MazeBingoConfig extends Config {
         position = 2
     )
     default MazeSound notificationSound() {
-        return MazeSound.DING;
+        return MazeSound.SINGLE_BARK;
     }
 
 }

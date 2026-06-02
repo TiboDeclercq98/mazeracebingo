@@ -27,6 +27,7 @@ class MazeMapPanel extends JPanel {
 
     private MazeState state;
     private Set<Integer> revealed;
+    private Set<Integer> boobyTrapIndices = Set.of();
     private Consumer<TileData> onTileClick;
     private int selectedTileId = -1;
 
@@ -69,6 +70,15 @@ class MazeMapPanel extends JPanel {
     void updateState(MazeState state, Set<Integer> revealed) {
         this.state = state;
         this.revealed = revealed;
+        if (state != null && state.boobytraps != null && state.size > 0) {
+            java.util.HashSet<Integer> btSet = new java.util.HashSet<>();
+            for (com.mazebingo.model.MazeState.BoobyTrapPos b : state.boobytraps) {
+                btSet.add(b.row * state.size + b.col);
+            }
+            boobyTrapIndices = btSet;
+        } else {
+            boobyTrapIndices = Set.of();
+        }
         if (state != null) {
             int dim = state.size * CELL + PADDING * 2;
             setPreferredSize(new Dimension(dim, dim));
@@ -138,7 +148,8 @@ class MazeMapPanel extends JPanel {
 
                 int x = PADDING + col * CELL;
                 int y = PADDING + row * CELL;
-                g2.setColor(tile.completed ? Color.WHITE : new Color(170, 170, 170));
+                boolean isBoobytrap = tile.completed && boobyTrapIndices.contains(idx);
+                g2.setColor(isBoobytrap ? Color.RED : (tile.completed ? Color.WHITE : new Color(170, 170, 170)));
                 String label = String.valueOf(tile.id);
                 g2.drawString(label,
                     x + (CELL - fm.stringWidth(label)) / 2,

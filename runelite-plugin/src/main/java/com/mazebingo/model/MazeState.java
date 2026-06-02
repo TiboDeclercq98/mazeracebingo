@@ -10,6 +10,7 @@ public class MazeState {
     public boolean gameOver;
     public Map<String, String> tileDescriptions;
     public List<BoobyTrapPos> boobytraps;
+    public List<MazeEventEntry> recentEvents;
 
     public static class BoobyTrapPos {
         public int row;

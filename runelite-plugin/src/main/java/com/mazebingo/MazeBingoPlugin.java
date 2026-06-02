@@ -87,6 +87,9 @@ public class MazeBingoPlugin extends Plugin {
     private volatile String lastKnownVersion = null;
     private NavigationButton navButton;
 
+    private volatile int lastSeenEventId = 0;
+    private volatile boolean eventsInitialized = false;
+
     @Override
     protected void startUp() {
         executor = Executors.newSingleThreadScheduledExecutor();
@@ -150,6 +153,8 @@ public class MazeBingoPlugin extends Plugin {
         xpSnapshot.clear();
         attackedNpcs.clear();
         lastKnownVersion = null;
+        lastSeenEventId = 0;
+        eventsInitialized = false;
         panel.clear();
     }
 
@@ -166,6 +171,8 @@ public class MazeBingoPlugin extends Plugin {
             attackedNpcs.clear();
             selectedTileId = -1;
             lastKnownVersion = null;
+            lastSeenEventId = 0;
+            eventsInitialized = false;
             panel.clear();
         }
     }
@@ -312,20 +319,6 @@ public class MazeBingoPlugin extends Plugin {
             String contrib = amount + (subCategory != null ? " " + subCategory : "") + suffix;
             sendChatMessage("You contributed " + contrib + " to tile " + tile.id + ".");
 
-            if (response.completed) {
-                panel.addEvent(playerName + " has completed tile " + tile.id + "!", new Color(76, 175, 80));
-            }
-
-            if (response.specialEvent != null && response.specialEvent.isJsonObject()) {
-                JsonObject se = response.specialEvent.getAsJsonObject();
-                if (se.has("message")) {
-                    String seMsg = se.get("message").getAsString();
-                    String seType = se.has("type") ? se.get("type").getAsString() : "";
-                    Color seColor = "gameover".equals(seType) ? Color.RED : new Color(255, 204, 0);
-                    panel.addEvent(seMsg, seColor);
-                }
-            }
-
             for (int i = 0; i < activeTiles.size(); i++) {
                 ActiveTile t = activeTiles.get(i);
                 if (t.id == tile.id) {
@@ -423,6 +416,25 @@ public class MazeBingoPlugin extends Plugin {
         panel.setStatus("Connected");
         panel.updateMazeState(state);
         panel.updateTiles(activeTiles);
+
+        if (state.recentEvents != null) {
+            if (!eventsInitialized) {
+                for (com.mazebingo.model.MazeEventEntry e : state.recentEvents) {
+                    if (e.id > lastSeenEventId) lastSeenEventId = e.id;
+                }
+                eventsInitialized = true;
+            } else {
+                for (com.mazebingo.model.MazeEventEntry e : state.recentEvents) {
+                    if (e.id > lastSeenEventId) {
+                        Color color = "gameover".equals(e.type) ? Color.RED
+                            : "tile_complete".equals(e.type) ? new Color(76, 175, 80)
+                            : new Color(255, 204, 0);
+                        panel.addEvent(e.message, color);
+                        lastSeenEventId = e.id;
+                    }
+                }
+            }
+        }
 
         int selId = selectedTileId;
         if (selId >= 0) {

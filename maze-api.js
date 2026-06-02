@@ -89,6 +89,23 @@ async function initDb() {
     submittedAt TIMESTAMPTZ DEFAULT NOW()
   )`);
   await dbQuery(`ALTER TABLE tile_progress ADD COLUMN IF NOT EXISTS subCategory VARCHAR(64) DEFAULT NULL`);
+  // Team-visible event feed: tile completions and special events.
+  await dbQuery(`CREATE TABLE IF NOT EXISTS team_events (
+    id SERIAL PRIMARY KEY,
+    team VARCHAR(64) NOT NULL,
+    player_name VARCHAR(64),
+    tile_id INT,
+    type VARCHAR(32) NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+}
+
+async function insertTeamEvent(team, playerName, tileId, type, message) {
+  await dbQuery(
+    'INSERT INTO team_events (team, player_name, tile_id, type, message) VALUES ($1, $2, $3, $4, $5)',
+    [team, playerName, tileId, type, message]
+  );
 }
 initDb();
 
@@ -331,6 +348,7 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
     if (isEnd) {
       await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
       specialEvent = { type: 'gameover', message: 'The end tile was completed! The entire maze is now revealed. Game over.' };
+      await insertTeamEvent(team, playerName, id, 'gameover', `${playerName} completed the end tile! Game over.`);
     } else {
       const idx = id - 1;
       const row = Math.floor(idx / SIZE);
@@ -342,8 +360,11 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
         specialEvent = { type: 'boobytrap', message: 'You found a key!' };
       }
 
-
-await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+      await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+      await insertTeamEvent(team, playerName, id, 'tile_complete', `${playerName} has completed tile ${id}!`);
+      if (isBoobytrap) {
+        await insertTeamEvent(team, playerName, id, 'boobytrap', `${playerName} has found a key!`);
+      }
     }
   } else {
     await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
@@ -505,6 +526,17 @@ app.get('/api/maze', async (req, res, next) => {
     const { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
     const endId = Math.floor(SIZE / 2) + 1;
     const gameOver = mazeState.some(t => t.id === endId && t.completed);
+    const eventsRows = await dbQuery(
+      'SELECT * FROM team_events WHERE team = $1 ORDER BY id DESC LIMIT 20',
+      [team]
+    );
+    const recentEvents = eventsRows.reverse().map(r => ({
+      id: r.id,
+      type: r.type,
+      playerName: r.player_name,
+      tileId: r.tile_id,
+      message: r.message
+    }));
     res.json({
       size: SIZE,
       walls: mazeWalls,
@@ -516,7 +548,8 @@ app.get('/api/maze', async (req, res, next) => {
       })),
       boobytraps: boobytrapPositions,
       tileDescriptions,
-      gameOver
+      gameOver,
+      recentEvents
     });
   } catch (err) { next(err); }
 });

@@ -75,6 +75,24 @@ public class MazeApiClient {
         }
     }
 
+    public String fetchStateVersion(String apiUrl, String team) {
+        HttpUrl url = HttpUrl.parse(apiUrl + "/api/state-version")
+            .newBuilder()
+            .addQueryParameter("team", team)
+            .build();
+
+        Request request = new Request.Builder().url(url).get().build();
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful() || response.body() == null) return null;
+            JsonObject obj = gson.fromJson(response.body().charStream(), JsonObject.class);
+            return obj.has("lastUpdated") && !obj.get("lastUpdated").isJsonNull()
+                ? obj.get("lastUpdated").getAsString() : null;
+        } catch (Exception e) {
+            log.warn("Failed to fetch state version", e);
+            return null;
+        }
+    }
+
     public TileProgressResponse fetchTileProgress(String apiUrl, int tileId, String team) {
         HttpUrl url = HttpUrl.parse(apiUrl + "/api/tiles/progress/" + tileId)
             .newBuilder()

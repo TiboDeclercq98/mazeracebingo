@@ -371,6 +371,20 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Lightweight version stamp — returns the timestamp of the last progress submission for a team.
+// Clients poll this cheaply to detect when a full refresh is needed.
+app.get('/api/state-version', async (req, res, next) => {
+  try {
+    const team = req.query.team;
+    if (!team) return res.status(400).json({ error: 'Missing team' });
+    const rows = await dbQuery(
+      'SELECT MAX(submittedat) AS lastupdated FROM tile_progress WHERE team = $1',
+      [team]
+    );
+    res.json({ lastUpdated: rows[0]?.lastupdated || null });
+  } catch (err) { next(err); }
+});
+
 app.get('/api/tiles', async (req, res, next) => {
   try {
     const team = req.query.team;

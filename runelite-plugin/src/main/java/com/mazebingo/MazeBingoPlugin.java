@@ -82,6 +82,8 @@ public class MazeBingoPlugin extends Plugin {
 
     private ScheduledExecutorService executor;
     private ScheduledFuture<?> pollTask;
+    private ScheduledFuture<?> versionPollTask;
+    private volatile String lastKnownVersion = null;
     private NavigationButton navButton;
 
     @Override
@@ -127,12 +129,16 @@ public class MazeBingoPlugin extends Plugin {
         }
 
         pollTask = executor.scheduleAtFixedRate(this::refreshMazeState, 60, 60, TimeUnit.SECONDS);
+        versionPollTask = executor.scheduleAtFixedRate(this::checkStateVersion, 10, 10, TimeUnit.SECONDS);
     }
 
     @Override
     protected void shutDown() {
         if (pollTask != null) {
             pollTask.cancel(false);
+        }
+        if (versionPollTask != null) {
+            versionPollTask.cancel(false);
         }
         if (executor != null) {
             executor.shutdownNow();
@@ -142,12 +148,14 @@ public class MazeBingoPlugin extends Plugin {
         activeTiles.clear();
         xpSnapshot.clear();
         attackedNpcs.clear();
+        lastKnownVersion = null;
         panel.clear();
     }
 
     @Subscribe
     public void onGameStateChanged(GameStateChanged event) {
         if (event.getGameState() == GameState.LOGGED_IN) {
+            lastKnownVersion = null;
             executor.execute(this::refreshMazeState);
             snapshotXp();
         } else if (event.getGameState() == GameState.LOGIN_SCREEN
@@ -156,6 +164,7 @@ public class MazeBingoPlugin extends Plugin {
             xpSnapshot.clear();
             attackedNpcs.clear();
             selectedTileId = -1;
+            lastKnownVersion = null;
             panel.clear();
         }
     }
@@ -327,7 +336,26 @@ public class MazeBingoPlugin extends Plugin {
             }
             panel.updateTiles(activeTiles);
             refreshMazeState();
+            String v = apiClient.fetchStateVersion(apiUrl, team);
+            if (v != null) lastKnownVersion = v;
         });
+    }
+
+    private void checkStateVersion() {
+        if (client.getGameState() != GameState.LOGGED_IN) return;
+        String team = config.teamName();
+        if (team.isEmpty()) return;
+        String version = apiClient.fetchStateVersion(config.apiUrl(), team);
+        if (version == null) return;
+        if (lastKnownVersion == null) {
+            // First check after startup/login — prime the version without a redundant refresh.
+            lastKnownVersion = version;
+            return;
+        }
+        if (!version.equals(lastKnownVersion)) {
+            lastKnownVersion = version;
+            refreshMazeState();
+        }
     }
 
     private void sendChatMessage(String message) {

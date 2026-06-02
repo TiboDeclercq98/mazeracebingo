@@ -1,0 +1,61 @@
+package com.mazebingo;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+class SoundGenerator {
+
+    private static final int SAMPLE_RATE = 44100;
+
+    static InputStream generate(MazeSound sound) {
+        switch (sound) {
+            case DING:        return tones(new double[]{880},        new double[]{0.35});
+            case DOUBLE_DING: return tones(new double[]{880, 1100},  new double[]{0.25, 0.30});
+            case CHIME:       return tones(new double[]{523},        new double[]{0.65});
+            default:          return null;
+        }
+    }
+
+    private static InputStream tones(double[] frequencies, double[] durations) {
+        int totalSamples = 0;
+        for (double d : durations) totalSamples += (int)(SAMPLE_RATE * d);
+
+        byte[] pcm = new byte[totalSamples * 2];
+        int offset = 0;
+        for (int t = 0; t < frequencies.length; t++) {
+            int numSamples = (int)(SAMPLE_RATE * durations[t]);
+            for (int i = 0; i < numSamples; i++) {
+                double time = (double) i / SAMPLE_RATE;
+                double envelope = Math.exp(-time * 6.0);
+                double sample = Math.sin(2 * Math.PI * frequencies[t] * time) * envelope;
+                short value = (short)(sample * (Short.MAX_VALUE * 0.75));
+                pcm[offset + i * 2]     = (byte)(value & 0xFF);
+                pcm[offset + i * 2 + 1] = (byte)((value >> 8) & 0xFF);
+            }
+            offset += numSamples * 2;
+        }
+
+        return new ByteArrayInputStream(wavBytes(pcm));
+    }
+
+    private static byte[] wavBytes(byte[] pcm) {
+        ByteBuffer buf = ByteBuffer.allocate(44 + pcm.length).order(ByteOrder.LITTLE_ENDIAN);
+        buf.put(new byte[]{'R', 'I', 'F', 'F'});
+        buf.putInt(36 + pcm.length);
+        buf.put(new byte[]{'W', 'A', 'V', 'E'});
+        buf.put(new byte[]{'f', 'm', 't', ' '});
+        buf.putInt(16);
+        buf.putShort((short) 1);           // PCM
+        buf.putShort((short) 1);           // mono
+        buf.putInt(SAMPLE_RATE);
+        buf.putInt(SAMPLE_RATE * 2);       // byte rate (16-bit mono)
+        buf.putShort((short) 2);           // block align
+        buf.putShort((short) 16);          // bits per sample
+        buf.put(new byte[]{'d', 'a', 't', 'a'});
+        buf.putInt(pcm.length);
+        buf.put(pcm);
+        return buf.array();
+    }
+}

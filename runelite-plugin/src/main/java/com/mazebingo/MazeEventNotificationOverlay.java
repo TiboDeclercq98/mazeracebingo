@@ -4,6 +4,7 @@ import net.runelite.api.Client;
 import net.runelite.api.WidgetNode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetModalMode;
+import net.runelite.client.audio.AudioPlayer;
 import net.runelite.client.callback.ClientThread;
 
 import javax.inject.Inject;
@@ -21,6 +22,7 @@ public class MazeEventNotificationOverlay {
 
     @Inject private Client client;
     @Inject private ClientThread clientThread;
+    @Inject private AudioPlayer audioPlayer;
     @Inject private MazeBingoConfig config;
 
     private WidgetNode popupWidgetNode;
@@ -47,7 +49,15 @@ public class MazeEventNotificationOverlay {
 
                 MazeSound sound = config.notificationSound();
                 if (sound != MazeSound.NONE) {
-                    client.playSoundEffect(sound.getId());
+                    int gameVolume = client.getPreferences().getSoundEffectVolume();
+                    if (gameVolume > 0) {
+                        float gain = 20f * (float) Math.log10(gameVolume / 100f);
+                        try {
+                            audioPlayer.play(SoundGenerator.generate(sound), gain);
+                        } catch (Exception ex) {
+                            // ignored
+                        }
+                    }
                 }
 
                 clientThread.invokeLater(this::tryClearMessage);

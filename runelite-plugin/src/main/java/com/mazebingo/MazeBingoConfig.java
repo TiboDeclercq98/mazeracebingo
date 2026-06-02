@@ -3,7 +3,6 @@ package com.mazebingo;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
-import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("mazebingo")
 public interface MazeBingoConfig extends Config {
@@ -35,7 +34,7 @@ public interface MazeBingoConfig extends Config {
         position = 2
     )
     default MazeSound notificationSound() {
-        return MazeSound.COLLECTION_LOG;
+        return MazeSound.DING;
     }
 
 }

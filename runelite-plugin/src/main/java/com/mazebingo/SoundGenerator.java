@@ -1,6 +1,7 @@
 package com.mazebingo;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -14,7 +15,19 @@ class SoundGenerator {
             case DING:        return tones(new double[]{880},        new double[]{0.35});
             case DOUBLE_DING: return tones(new double[]{880, 1100},  new double[]{0.25, 0.30});
             case CHIME:       return tones(new double[]{523},        new double[]{0.65});
+            case SINGLE_BARK: return loadPcm("/com/mazebingo/sounds/single_bark.pcm");
             default:          return null;
+        }
+    }
+
+    // Loads a raw 44100 Hz, 16-bit, mono PCM file and wraps it in a WAV header.
+    private static InputStream loadPcm(String resource) {
+        try (InputStream in = SoundGenerator.class.getResourceAsStream(resource)) {
+            if (in == null) return null;
+            byte[] pcm = in.readAllBytes();
+            return new ByteArrayInputStream(wavBytes(pcm));
+        } catch (IOException e) {
+            return null;
         }
     }
 

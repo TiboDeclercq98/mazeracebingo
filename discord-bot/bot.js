@@ -270,7 +270,7 @@ client.on('interactionCreate', async interaction => {
       if (data.taskType === 'xp_gain')   header += ` — Gain **${data.target.toLocaleString()} ${data.taskConfig.skill} XP**`;
       if (data.taskType === 'item_drop') { const items = data.taskConfig.items ?? [data.taskConfig.item]; const itemLabel = items.length > 1 ? items.slice(0, -1).join(', ') + ' or ' + items[items.length - 1] : items[0]; header += ` — Receive **${itemLabel}** — ${data.currentProgress} / ${data.target}`; }
       const contribs = data.contributions.length
-        ? data.contributions.map(c => `• **${c.playerName}**: ${c.amount}`).join('\n')
+        ? data.contributions.map(c => `• **${c.playerName}**: ${c.amount}${c.subCategory ? ' ' + c.subCategory : ''}`).join('\n')
         : '_No progress submitted yet._';
       await interaction.editReply(
         `${header}\n${bar} ${data.currentProgress} / ${data.target} (${pct}%)\n\n${contribs}`

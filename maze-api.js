@@ -85,8 +85,10 @@ async function initDb() {
     team VARCHAR(64) NOT NULL,
     playerName VARCHAR(64) NOT NULL,
     amount INT NOT NULL DEFAULT 1,
+    subCategory VARCHAR(64) DEFAULT NULL,
     submittedAt TIMESTAMPTZ DEFAULT NOW()
   )`);
+  await dbQuery(`ALTER TABLE tile_progress ADD COLUMN IF NOT EXISTS subCategory VARCHAR(64) DEFAULT NULL`);
 }
 initDb();
 
@@ -285,7 +287,7 @@ async function saveTaskDefinitions(team, taskDefinitions) {
 // Validates tile access, records a progress contribution, updates tile state, and fires special events.
 // Returns { success, tile, specialEvent, progress, target, completed } on success,
 // or { error, status } / { success: false, alreadyCompleted, tile, status } on failure.
-async function submitTileProgress(team, id, playerName, amount) {
+async function submitTileProgress(team, id, playerName, amount, subCategory = null) {
   let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
   const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
   const endId   = Math.floor(SIZE / 2) + 1;
@@ -308,8 +310,8 @@ async function submitTileProgress(team, id, playerName, amount) {
 
   // Record the individual contribution before updating the tile.
   await dbQuery(
-    'INSERT INTO tile_progress (tileId, team, playerName, amount) VALUES ($1, $2, $3, $4)',
-    [id, team, playerName, amount]
+    'INSERT INTO tile_progress (tileId, team, playerName, amount, subCategory) VALUES ($1, $2, $3, $4, $5)',
+    [id, team, playerName, amount, subCategory || null]
   );
 
   tile.completionsDone = (tile.completionsDone || 0) + amount;
@@ -442,10 +444,11 @@ app.post('/api/tiles/progress/:id', async (req, res, next) => {
   try {
     const team = req.query.team;
     if (!team) return res.status(400).json({ error: 'Missing team' });
-    const id         = parseInt(req.params.id, 10);
-    const playerName = req.body.playerName || 'unknown';
-    const amount     = Math.max(1, parseInt(req.body.amount, 10) || 1);
-    const result = await submitTileProgress(team, id, playerName, amount);
+    const id          = parseInt(req.params.id, 10);
+    const playerName  = req.body.playerName || 'unknown';
+    const amount      = Math.max(1, parseInt(req.body.amount, 10) || 1);
+    const subCategory = req.body.subCategory || null;
+    const result = await submitTileProgress(team, id, playerName, amount, subCategory);
     if (result.error)            return res.status(result.status).json({ error: result.error });
     if (result.alreadyCompleted) return res.status(400).json({ success: false, alreadyCompleted: true, tile: result.tile });
     res.json({
@@ -471,9 +474,9 @@ app.get('/api/tiles/progress/:id', async (req, res, next) => {
     const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE tileid = $1 AND team = $2', [id, team]);
     const taskDef  = taskDefs[0] || null;
     const rows = await dbQuery(
-      `SELECT playername, SUM(amount) AS total, MAX(submittedat) AS lastsubmitted
+      `SELECT playername, subcategory, SUM(amount) AS total, MAX(submittedat) AS lastsubmitted
        FROM tile_progress WHERE tileid = $1 AND team = $2
-       GROUP BY playername ORDER BY total DESC`,
+       GROUP BY playername, subcategory ORDER BY total DESC`,
       [id, team]
     );
     res.json({
@@ -482,7 +485,7 @@ app.get('/api/tiles/progress/:id', async (req, res, next) => {
       taskConfig:      taskDef ? taskDef.taskconfig : null,
       currentProgress: tile.completionsDone || 0,
       target:          tile.completionsRequired || 1,
-      contributions:   rows.map(r => ({ playerName: r.playername, amount: r.total, lastSubmitted: r.lastsubmitted }))
+      contributions:   rows.map(r => ({ playerName: r.playername, subCategory: r.subcategory || null, amount: r.total, lastSubmitted: r.lastsubmitted }))
     });
   } catch (err) { next(err); }
 });

@@ -13,6 +13,7 @@ public class TileProgressResponse {
 
     public static class Contribution {
         public String playerName;
+        public String subCategory;
         public int amount;
     }
 }

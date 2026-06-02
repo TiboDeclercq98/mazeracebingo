@@ -44,7 +44,7 @@ public class MazeApiClient {
         }
     }
 
-    public ProgressResponse postProgress(String apiUrl, int tileId, String playerName, int amount, String team) {
+    public ProgressResponse postProgress(String apiUrl, int tileId, String playerName, int amount, String team, String subCategory) {
         HttpUrl url = HttpUrl.parse(apiUrl + "/api/tiles/progress/" + tileId)
             .newBuilder()
             .addQueryParameter("team", team)
@@ -53,6 +53,9 @@ public class MazeApiClient {
         JsonObject body = new JsonObject();
         body.addProperty("playerName", playerName);
         body.addProperty("amount", amount);
+        if (subCategory != null) {
+            body.addProperty("subCategory", subCategory);
+        }
 
         RequestBody requestBody = RequestBody.create(JSON_MEDIA_TYPE, gson.toJson(body));
         Request request = new Request.Builder().url(url).post(requestBody).build();

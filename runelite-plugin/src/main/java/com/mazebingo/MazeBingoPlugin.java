@@ -174,7 +174,7 @@ public class MazeBingoPlugin extends Plugin {
             cfg.has("skill") && skillName.equalsIgnoreCase(cfg.get("skill").getAsString()));
 
         for (ActiveTile tile : matches) {
-            submitProgress(tile, gained);
+            submitProgress(tile, gained, null);
         }
     }
 
@@ -213,12 +213,12 @@ public class MazeBingoPlugin extends Plugin {
                         cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
                     log.info("Retry matched {} tile(s) for npc_kill '{}'", retry.size(), npcName);
                     for (ActiveTile tile : retry) {
-                        submitProgress(tile, 1);
+                        submitProgress(tile, 1, null);
                     }
                 });
             } else {
                 for (ActiveTile tile : matches) {
-                    submitProgress(tile, 1);
+                    submitProgress(tile, 1, null);
                 }
             }
         }
@@ -245,14 +245,14 @@ public class MazeBingoPlugin extends Plugin {
                 return cfg.has("item") && itemName.equalsIgnoreCase(cfg.get("item").getAsString());
             });
             for (ActiveTile tile : matches) {
-                submitProgress(tile, stack.getQuantity());
+                submitProgress(tile, stack.getQuantity(), itemName);
             }
         }
     }
 
     // --- Internal helpers ---
 
-    private void submitProgress(ActiveTile tile, int amount) {
+    private void submitProgress(ActiveTile tile, int amount, String subCategory) {
         if (client.getLocalPlayer() == null) return;
         String playerName = client.getLocalPlayer().getName();
         if (playerName == null) return;
@@ -262,7 +262,7 @@ public class MazeBingoPlugin extends Plugin {
         if (team.isEmpty()) return;
 
         executor.execute(() -> {
-            ProgressResponse response = apiClient.postProgress(apiUrl, tile.id, playerName, amount, team);
+            ProgressResponse response = apiClient.postProgress(apiUrl, tile.id, playerName, amount, team, subCategory);
             if (response == null) {
                 log.warn("Progress submit for tile {} returned null (API error)", tile.id);
                 return;

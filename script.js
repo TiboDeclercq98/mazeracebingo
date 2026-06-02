@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else taskLine = `Progress: ${data.currentProgress} / ${data.target}`;
             const pct  = Math.min(100, Math.round((data.currentProgress / data.target) * 100));
             const contribRows = data.contributions.length
-                ? data.contributions.map(c => `<tr><td>${escapeHtml(c.playerName)}</td><td>${c.amount}</td></tr>`).join('')
+                ? data.contributions.map(c => `<tr><td>${escapeHtml(c.playerName)}</td><td>${c.amount}${c.subCategory ? ' ' + escapeHtml(c.subCategory) : ''}</td></tr>`).join('')
                 : '<tr><td colspan="2"><em>No progress yet</em></td></tr>';
             progressModalBody.innerHTML = `
                 <p>${taskLine}</p>

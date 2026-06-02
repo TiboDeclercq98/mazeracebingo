@@ -28,7 +28,6 @@ public class MazeEventNotificationOverlay {
     @Inject private Client client;
     @Inject private ClientThread clientThread;
     @Inject private AudioPlayer audioPlayer;
-    @Inject private MazeBingoConfig config;
 
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
@@ -52,16 +51,12 @@ public class MazeEventNotificationOverlay {
                 popupWidgetNode = client.openInterface(componentId, 660, WidgetModalMode.MODAL_CLICKTHROUGH);
                 client.runScript(3343, "Maze Race Bingo", message, -1);
 
-                MazeSound sound = config.notificationSound();
-                log.info("Notification sound config: {}, gameVolume: {}", sound, client.getPreferences().getSoundEffectVolume());
-                if (sound != MazeSound.NONE) {
-                    InputStream stream = SoundGenerator.generate(sound);
-                    if (stream != null) {
-                        try {
-                            audioPlayer.play(stream, 0f);
-                        } catch (Exception ex) {
-                            log.warn("Failed to play notification sound {}", sound, ex);
-                        }
+                InputStream stream = SoundGenerator.generate(MazeSound.SHORT_DOG_BARK);
+                if (stream != null) {
+                    try {
+                        audioPlayer.play(stream, 0f);
+                    } catch (Exception ex) {
+                        log.warn("Failed to play notification sound", ex);
                     }
                 }
 

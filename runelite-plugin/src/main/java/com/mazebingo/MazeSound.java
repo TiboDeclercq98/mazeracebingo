@@ -5,7 +5,8 @@ public enum MazeSound {
     DING("Ding"),
     DOUBLE_DING("Double ding"),
     CHIME("Chime"),
-    SINGLE_BARK("Single bark");
+    SINGLE_BARK("Single bark"),
+    SHORT_DOG_BARK("Short dog bark");
 
     private final String displayName;
 

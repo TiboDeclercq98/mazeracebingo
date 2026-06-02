@@ -26,15 +26,4 @@ public interface MazeBingoConfig extends Config {
     default String teamName() {
         return "";
     }
-
-    @ConfigItem(
-        keyName = "notificationSound",
-        name = "Notification sound",
-        description = "Sound to play when a team event appears",
-        position = 2
-    )
-    default MazeSound notificationSound() {
-        return MazeSound.SINGLE_BARK;
-    }
-
 }

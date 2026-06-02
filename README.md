@@ -1,6 +1,6 @@
-# MazeRace
+# MazeBingo
 
-A team-based maze racing game for OSRS bingo events. Teams navigate a 9×9 grid from START (bottom-centre) to END (top-centre) by completing tiles. Played via **Discord slash commands** with a **web UI** for live visualization.
+A team-based maze racing game for OSRS bingo events. Teams navigate a 9×9 grid from START (bottom-centre) to END (top-centre) by completing in-game tasks. Played via **Discord slash commands**, tracked automatically via a **RuneLite plugin**, and visualized in a **web UI**.
 
 ---
 
@@ -8,8 +8,19 @@ A team-based maze racing game for OSRS bingo events. Teams navigate a 9×9 grid 
 
 - The maze is a 9×9 grid of tiles. Tiles are hidden until adjacent to a completed tile with no wall blocking the path.
 - Each tile has a task (e.g. kill Vorkath 50 times, gain 100k Slayer XP). The whole team contributes toward the tile's progress.
-- Special mechanics: **booby traps** (increase a nearby tile's completion requirement) and **chests** on dead-ends (decrease a nearby tile's requirement).
+- Special mechanics: **booby traps** (completing one increases a nearby tile's requirement) and **chests** on dead-ends (completing one decreases a nearby tile's requirement).
 - Game ends when the END tile is completed — the full maze is revealed.
+
+---
+
+## Components
+
+| Component | Description |
+|---|---|
+| `maze-api.js` | Express API server — source of truth for maze state |
+| `index.html` / `script.js` | Web UI for live maze visualization and maze design |
+| `discord-bot/bot.js` | Discord slash commands bot |
+| `runelite-plugin/` | RuneLite plugin for automatic in-game task tracking |
 
 ---
 
@@ -17,7 +28,7 @@ A team-based maze racing game for OSRS bingo events. Teams navigate a 9×9 grid 
 
 ### Prerequisites
 - Node.js 18+
-- A MySQL database
+- A PostgreSQL database
 - Discord bot token
 
 ### Setup
@@ -49,37 +60,140 @@ A team-based maze racing game for OSRS bingo events. Teams navigate a 9×9 grid 
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `DB_HOST` | MySQL host | `localhost` |
-| `DB_USER` | MySQL user | — |
-| `DB_PASSWORD` | MySQL password | — |
-| `DB_NAME` | MySQL database name | `MazeRaceBingoStates` |
-| `DB_PORT` | MySQL port | `3306` |
-| `DB_POOL_SIZE` | Connection pool size | `1` |
-| `PORT` | API server port | `3000` |
-| `FRONTEND_URL` | Frontend URL used for Playwright screenshots | `https://mazeracebingo-1.onrender.com/` |
-| `ALLOWED_ORIGINS` | Comma-separated allowed CORS origins | _(none — CORS blocked)_ |
-| `DISCORD_TOKEN` | Discord bot token | — |
-| `API_BASE_URL` | Base URL of the API server (used by bot) | — |
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `PORT` | No | `3000` | API server port |
+| `FRONTEND_URL` | No | `https://mazeracebingo-1.onrender.com/` | Frontend URL used by Playwright for screenshots |
+| `ALLOWED_ORIGINS` | No | _(none — CORS blocked)_ | Comma-separated allowed CORS origins |
+| `DISCORD_TOKEN` | Yes (bot) | — | Discord bot token |
+| `API_BASE_URL` | Yes (bot) | — | Base URL of the API server (used by bot) |
 
 ---
 
 ## Discord Commands
 
-| Command | Description |
+All commands detect the team from the **Discord channel name**.
+
+| Command | Options | Description |
+|---|---|---|
+| `/completetile` | `id` (tile number, `start`, or `end`) | Complete a tile — returns a maze screenshot |
+| `/submittask` | `tile` (int), `player` (RSN), `amount` (int, optional) | Submit incremental progress toward a tile task |
+| `/progress` | `tile` (int) | Show per-player contribution breakdown for a tile |
+| `/createmaze` | `savefile` (JSON attachment, optional) | Create a new maze, optionally from a JSON save file |
+| `/fetchmaze` | — | Fetch the current maze state as JSON |
+
+---
+
+## RuneLite Plugin
+
+The RuneLite plugin automatically tracks in-game events and submits progress to the API.
+
+### Configuration
+
+In the RuneLite settings panel (search "Maze"):
+
+| Setting | Default | Description |
+|---|---|---|
+| API URL | `https://mazeracebingo.onrender.com` | Base URL of the API server |
+| Team Name | _(empty)_ | Your team name — must match the team used in Discord |
+
+### Tracked Event Types
+
+| Task Type | What is tracked |
 |---|---|
-| `/completetile id:<id>` | Complete a tile (number, `start`, or `end`) — returns a maze screenshot |
-| `/submittask tile:<id> player:<rsn> amount:<n>` | Submit incremental progress toward a tile task |
-| `/progress tile:<id>` | Show per-player contribution breakdown for a tile |
-| `/createmaze [savefile]` | Create a new maze, optionally from a JSON save file |
-| `/fetchmaze` | Fetch the current maze state as JSON |
+| `npc_kill` | Kills on a specific NPC the player attacked |
+| `xp_gain` | XP gained in a specific skill (delta since tracking started) |
+| `item_drop` | Items received from NPC loot (`NpcLootReceived` event) |
+
+The plugin displays a maze map panel and a tile info panel in the RuneLite sidebar showing current task progress.
+
+---
+
+## Web UI
+
+Open `index.html?team=yourteamname` in a browser.
+
+- **Live maze**: 9×9 grid rendered from API, auto-refreshed every ~2 seconds.
+- **Fog of war**: Tiles hidden until adjacent to a completed tile (can be toggled).
+- **Tile details**: Click any visible tile to see per-player contribution breakdown.
+- **Maze designer**: Draw walls, place booby traps and chests, add task definitions, save/load JSON.
+
+### Toolbar Buttons
+
+| Button | Description |
+|---|---|
+| Reset | Clear all tile progress for the current maze |
+| Fog | Toggle fog of war on/off |
+| Save | Download current maze state as JSON |
+| Load | Upload a maze JSON file |
+| Tasks | Edit task descriptions and types for each tile |
+| Traps | Mark boobytrap/chest tile locations |
+| Draw | Open the maze wall design tool |
+
+---
+
+## API Reference
+
+All endpoints require a `?team=<teamname>` query parameter unless noted.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Health check — tests DB connectivity |
+| `GET` | `/api/maze` | Full maze state including walls, tiles, tasks, and progress |
+| `GET` | `/api/tiles` | Tile list with completion status |
+| `GET` | `/api/tiles/progress/:id` | Per-player progress breakdown for a tile |
+| `POST` | `/api/tiles/complete/:id` | Complete a tile; returns PNG screenshot |
+| `POST` | `/api/tiles/progress/:id` | Submit progress `{ playerName, amount, subCategory? }` |
+| `POST` | `/api/tiles/uncomplete/:id` | Uncomplete a tile (must have exactly 1 adjacent completed tile) |
+| `POST` | `/api/create` | Create a new maze from save file JSON `{ saveData }` |
+
+### Maze Response Format
+
+```json
+{
+  "size": 9,
+  "walls": [
+    { "row": 0, "col": 0, "walls": { "top": true, "right": false, "bottom": false, "left": true } }
+  ],
+  "tiles": [
+    {
+      "id": 1,
+      "completed": false,
+      "completionsRequired": 50,
+      "completionsDone": 12,
+      "currentProgress": 12,
+      "taskType": "npc_kill",
+      "taskConfig": { "npc": "Vorkath", "target": 50 }
+    }
+  ],
+  "boobytraps": [{ "row": 3, "col": 4 }],
+  "tileDescriptions": { "5": "Kill Vorkath" },
+  "gameOver": false
+}
+```
+
+### Progress Response Format
+
+```json
+{
+  "success": true,
+  "progress": 12,
+  "target": 50,
+  "completed": false,
+  "specialEvent": {
+    "type": "boobytrap | chest | gameover",
+    "message": "..."
+  },
+  "tile": { "id": 5, "completed": false }
+}
+```
 
 ---
 
 ## Save File Format
 
-Save files are JSON uploaded via `/createmaze`. Required fields:
+Save files are JSON uploaded via `/createmaze` or the web UI Load button.
 
 ```json
 {
@@ -93,31 +207,90 @@ Save files are JSON uploaded via `/createmaze`. Required fields:
     "5": "Kill Vorkath"
   },
   "taskDefinitions": [
-    { "tileId": 5, "taskType": "npc_kill", "taskConfig": { "npc": "Vorkath", "target": 50 } },
-    { "tileId": 12, "taskType": "xp_gain", "taskConfig": { "skill": "Slayer", "target": 100000 } },
-    { "tileId": 20, "taskType": "item_drop", "taskConfig": { "item": "Tanzanite fang", "target": 1 } }
-    { "tileId": 30, "taskType": "item_drop", "taskConfig": { "items": ["Tanzanite fang", "Uncut onxy"], "target": 1 } }
+    { "tileId": 5,  "taskType": "npc_kill",  "taskConfig": { "npc": "Vorkath",        "target": 50     } },
+    { "tileId": 12, "taskType": "xp_gain",   "taskConfig": { "skill": "Slayer",        "target": 100000 } },
+    { "tileId": 20, "taskType": "item_drop", "taskConfig": { "item": "Tanzanite fang", "target": 1      } },
+    { "tileId": 30, "taskType": "item_drop", "taskConfig": { "items": ["Tanzanite fang", "Uncut onyx"], "target": 1 } }
   ]
 }
 ```
 
-Supported `taskType` values: `npc_kill`, `xp_gain`, `item_drop`.
-Setting `taskConfig.target` automatically sets `completionsRequired` for the tile.
+`taskConfig.target` sets both the task goal and `completionsRequired` for the tile.
+
+### Task Types
+
+| Task Type | Config fields | Description |
+|---|---|---|
+| `npc_kill` | `npc` (string), `target` (int) | Kill a specific NPC N times |
+| `xp_gain` | `skill` (string), `target` (int) | Gain N XP in a specific skill |
+| `item_drop` | `item` (string) OR `items` (array), `target` (int) | Receive an item from NPC loot N times |
 
 ---
 
-## API Reference
+## Special Game Mechanics
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Health check (tests DB connectivity) |
-| `GET` | `/api/maze?team=` | Full maze state including task definitions and progress |
-| `GET` | `/api/tiles?team=` | Tile list |
-| `GET` | `/api/tiles/progress/:id?team=` | Per-player progress breakdown for a tile |
-| `POST` | `/api/tiles/complete/:id?team=` | Complete a tile (amount=1); returns PNG screenshot |
-| `POST` | `/api/tiles/progress/:id?team=` | Submit progress `{ playerName, amount }`; returns JSON |
-| `POST` | `/api/tiles/uncomplete/:id?team=` | Uncomplete a tile (must have exactly 1 adjacent completed tile) |
-| `POST` | `/api/create?team=` | Create a new maze from save file JSON `{ saveData }` |
+**Fog of War** — Tiles are hidden unless adjacent to a completed tile with no wall blocking the path. The START tile is always visible. The full maze is revealed when END is completed.
+
+**Booby Traps** — When a boobytrap tile is completed, a random revealed incomplete tile's `completionsRequired` increases by that tile's `target` amount.
+
+**Chests (Dead-ends)** — Dead-end tiles (3 walls on a tile) act as chests. When completed, a random revealed incomplete tile's `completionsRequired` decreases by 1. If it reaches 0 it auto-completes.
+
+**Game Over** — When the END tile (top-centre) is completed, no further progress can be submitted.
+
+---
+
+## Database Schema
+
+PostgreSQL, connected via `DATABASE_URL`.
+
+```sql
+CREATE TABLE tiles (
+  id                  INT,
+  team                VARCHAR(64),
+  completed           SMALLINT,
+  completionsRequired INT DEFAULT 1,
+  completionsDone     INT DEFAULT 0,
+  PRIMARY KEY (id, team)
+);
+
+CREATE TABLE walls (
+  row   INT,
+  col   INT,
+  team  VARCHAR(64),
+  walls JSONB   -- { "top": bool, "right": bool, "bottom": bool, "left": bool }
+);
+
+CREATE TABLE boobytraps (
+  row  INT,
+  col  INT,
+  team VARCHAR(64)
+);
+
+CREATE TABLE tileDescriptions (
+  tileId      INT,
+  team        VARCHAR(64),
+  description TEXT,
+  PRIMARY KEY (tileId, team)
+);
+
+CREATE TABLE taskDefinitions (
+  tileId     INT,
+  team       VARCHAR(64),
+  taskType   VARCHAR(32),
+  taskConfig JSONB,
+  PRIMARY KEY (tileId, team)
+);
+
+CREATE TABLE tile_progress (
+  id          SERIAL PRIMARY KEY,
+  tileId      INT,
+  team        VARCHAR(64),
+  playerName  VARCHAR(64),
+  amount      INT DEFAULT 1,
+  subCategory VARCHAR(64),
+  submittedAt TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
 ---
 

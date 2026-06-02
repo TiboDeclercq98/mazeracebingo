@@ -49,7 +49,6 @@ class MazeMapPanel extends JPanel {
                 int size = state.size;
                 if (col >= size || row >= size) return;
                 int idx = row * size + col;
-                if (idx == size / 2) return; // END tile
                 if (revealed == null || !revealed.contains(idx)) return;
                 TileData tile = idx < state.tiles.size() ? state.tiles.get(idx) : null;
                 if (tile == null) return;

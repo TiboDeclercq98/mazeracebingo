@@ -102,8 +102,8 @@ class TileInfoPanel extends JPanel {
     }
 
     void showLoading(int tileId, String description) {
-        titleLabel.setText("Tile " + tileId + (description.isEmpty() ? "" : ": " + description));
-        taskLabel.setText("Loading…");
+        titleLabel.setText("<html>Tile " + tileId + (description.isEmpty() ? "" : ": " + description) + "</html>");
+        taskLabel.setText("<html>Loading…</html>");
         progressBar.setValue(0);
         progressBar.setString("…");
         contribPanel.removeAll();
@@ -113,7 +113,7 @@ class TileInfoPanel extends JPanel {
     }
 
     void showTile(TileProgressResponse data, String description) {
-        titleLabel.setText("Tile " + data.tileId + (description.isEmpty() ? "" : ": " + description));
+        titleLabel.setText("<html>Tile " + data.tileId + (description.isEmpty() ? "" : ": " + description) + "</html>");
 
         String taskLine;
         if (data.taskConfig != null && data.taskConfig.isJsonObject()) {
@@ -141,7 +141,7 @@ class TileInfoPanel extends JPanel {
         } else {
             taskLine = "Progress: " + data.currentProgress + " / " + data.target;
         }
-        taskLabel.setText(taskLine);
+        taskLabel.setText("<html>" + taskLine + "</html>");
 
         int pct = data.target > 0 ? (int) Math.min(100.0, data.currentProgress * 100.0 / data.target) : 0;
         progressBar.setValue(pct);

@@ -101,8 +101,15 @@ public class MazeBingoPanel extends PluginPanel {
         SwingUtilities.invokeLater(() -> tileInfoPanel.showTile(data, description));
     }
 
+    void setSelectedTileOnMap(int tileId) {
+        SwingUtilities.invokeLater(() -> mazeMapPanel.setSelectedTileId(tileId));
+    }
+
     void hideTileInfo() {
-        SwingUtilities.invokeLater(() -> tileInfoPanel.clear());
+        SwingUtilities.invokeLater(() -> {
+            tileInfoPanel.clear();
+            mazeMapPanel.setSelectedTileId(-1);
+        });
     }
 
     void setOnTileInfoClose(Runnable callback) {
@@ -143,6 +150,7 @@ public class MazeBingoPanel extends PluginPanel {
             tilesPanel.revalidate();
             tilesPanel.repaint();
             tileInfoPanel.clear();
+            mazeMapPanel.setSelectedTileId(-1);
             statusLabel.setText("● Not connected");
             statusLabel.setForeground(Color.RED);
         });

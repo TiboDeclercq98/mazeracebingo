@@ -28,6 +28,7 @@ class MazeMapPanel extends JPanel {
     private MazeState state;
     private Set<Integer> revealed;
     private Consumer<TileData> onTileClick;
+    private int selectedTileId = -1;
 
     MazeMapPanel() {
         setBackground(new Color(30, 30, 30));
@@ -61,6 +62,11 @@ class MazeMapPanel extends JPanel {
         this.onTileClick = callback;
     }
 
+    void setSelectedTileId(int id) {
+        this.selectedTileId = id;
+        repaint();
+    }
+
     void updateState(MazeState state, Set<Integer> revealed) {
         this.state = state;
         this.revealed = revealed;
@@ -89,8 +95,7 @@ class MazeMapPanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
         int size = state.size;
-        int startIdx = (size - 1) * size + size / 2;
-        int endIdx   = size / 2;
+        int endIdx = size / 2;
 
         // Fill tiles
         for (int row = 0; row < size; row++) {
@@ -142,12 +147,20 @@ class MazeMapPanel extends JPanel {
             }
         }
 
-        // Gold border on start tile
-        int startRow = startIdx / size;
-        int startCol = startIdx % size;
-        g2.setColor(COLOR_START);
-        g2.setStroke(new BasicStroke(2f));
-        g2.drawRect(PADDING + startCol * CELL + 1, PADDING + startRow * CELL + 1, CELL - 3, CELL - 3);
+        // Gold border on selected tile
+        if (selectedTileId >= 0 && state.tiles != null) {
+            for (int i = 0; i < state.tiles.size(); i++) {
+                TileData t = state.tiles.get(i);
+                if (t != null && t.id == selectedTileId) {
+                    int selRow = i / size;
+                    int selCol = i % size;
+                    g2.setColor(COLOR_START);
+                    g2.setStroke(new BasicStroke(2f));
+                    g2.drawRect(PADDING + selCol * CELL + 1, PADDING + selRow * CELL + 1, CELL - 3, CELL - 3);
+                    break;
+                }
+            }
+        }
 
         // Walls for completed tiles only
         g2.setColor(COLOR_WALL);

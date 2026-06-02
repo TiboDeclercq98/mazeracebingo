@@ -90,6 +90,7 @@ public class MazeBingoPlugin extends Plugin {
                 return;
             }
             selectedTileId = tile.id;
+            panel.setSelectedTileOnMap(tile.id);
             String desc = tileDescriptions.getOrDefault(String.valueOf(tile.id), "");
             panel.showTileInfoLoading(tile.id, desc);
             String apiUrl = config.apiUrl();
@@ -101,7 +102,10 @@ public class MazeBingoPlugin extends Plugin {
                 }
             });
         });
-        panel.setOnTileInfoClose(() -> selectedTileId = -1);
+        panel.setOnTileInfoClose(() -> {
+            selectedTileId = -1;
+            panel.hideTileInfo();
+        });
 
         navButton = NavigationButton.builder()
             .tooltip("Maze Race Bingo")

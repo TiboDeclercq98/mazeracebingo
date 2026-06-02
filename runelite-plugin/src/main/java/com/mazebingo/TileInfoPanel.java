@@ -134,7 +134,6 @@ class TileInfoPanel extends JPanel {
                 } else {
                     itemLabel = cfg.has("item") ? cfg.get("item").getAsString() : "?";
                 }
-                String npc = cfg.has("npc") ? cfg.get("npc").getAsString() : "?";
                 taskLine = "Receive " + itemLabel + " — " + data.currentProgress + " / " + data.target;
             } else {
                 taskLine = "Progress: " + data.currentProgress + " / " + data.target;

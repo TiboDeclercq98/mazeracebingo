@@ -95,7 +95,8 @@ Save files are JSON uploaded via `/createmaze`. Required fields:
   "taskDefinitions": [
     { "tileId": 5, "taskType": "npc_kill", "taskConfig": { "npc": "Vorkath", "target": 50 } },
     { "tileId": 12, "taskType": "xp_gain", "taskConfig": { "skill": "Slayer", "target": 100000 } },
-    { "tileId": 20, "taskType": "item_drop", "taskConfig": { "npc": "Zulrah", "item": "Tanzanite fang", "target": 1 } }
+    { "tileId": 20, "taskType": "item_drop", "taskConfig": { "item": "Tanzanite fang", "target": 1 } }
+    { "tileId": 30, "taskType": "item_drop", "taskConfig": { "items": ["Tanzanite fang", "Uncut onxy"], "target": 1 } }
   ]
 }
 ```

@@ -101,6 +101,14 @@ public class MazeBingoPanel extends PluginPanel {
         SwingUtilities.invokeLater(() -> tileInfoPanel.showTile(data, description));
     }
 
+    void hideTileInfo() {
+        SwingUtilities.invokeLater(() -> tileInfoPanel.clear());
+    }
+
+    void setOnTileInfoClose(Runnable callback) {
+        tileInfoPanel.setOnClose(callback);
+    }
+
     void setStatus(String message) {
         SwingUtilities.invokeLater(() -> {
             boolean connected = "Connected".equals(message);

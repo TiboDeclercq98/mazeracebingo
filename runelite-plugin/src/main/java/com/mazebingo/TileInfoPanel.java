@@ -7,6 +7,7 @@ import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicProgressBarUI;
 import java.awt.*;
 
 class TileInfoPanel extends JPanel {
@@ -15,15 +16,46 @@ class TileInfoPanel extends JPanel {
     private final JLabel taskLabel;
     private final JProgressBar progressBar;
     private final JPanel contribPanel;
+    private Runnable onClose;
 
     TileInfoPanel() {
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        setLayout(new BorderLayout());
         setBackground(ColorScheme.DARKER_GRAY_COLOR);
         setAlignmentX(Component.LEFT_ALIGNMENT);
+        // outer EmptyBorder provides bottom gap vs tilesPanel; inner LineBorder is the visible frame
         setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR), "Tile Info"),
-            new EmptyBorder(2, 4, 4, 4)));
+            new EmptyBorder(0, 0, 6, 0),
+            BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR)));
+
+        // Header row
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
+        header.setBorder(new EmptyBorder(2, 6, 2, 4));
+
+        JLabel headerLabel = new JLabel("Tile Info");
+        headerLabel.setForeground(Color.WHITE);
+        headerLabel.setFont(FontManager.getRunescapeSmallFont());
+
+        JButton closeBtn = new JButton("×");
+        closeBtn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+        closeBtn.setForeground(Color.LIGHT_GRAY);
+        closeBtn.setBorderPainted(false);
+        closeBtn.setContentAreaFilled(false);
+        closeBtn.setFocusPainted(false);
+        closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        closeBtn.addActionListener(e -> {
+            clear();
+            if (onClose != null) onClose.run();
+        });
+
+        header.add(headerLabel, BorderLayout.CENTER);
+        header.add(closeBtn, BorderLayout.EAST);
+
+        // Content panel
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        content.setBorder(new EmptyBorder(5, 6, 6, 6));
 
         titleLabel = new JLabel();
         titleLabel.setForeground(Color.WHITE);
@@ -41,21 +73,32 @@ class TileInfoPanel extends JPanel {
         progressBar.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
         progressBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 16));
         progressBar.setAlignmentX(Component.LEFT_ALIGNMENT);
+        progressBar.setUI(new BasicProgressBarUI() {
+            @Override protected Color getSelectionForeground() { return Color.WHITE; }
+            @Override protected Color getSelectionBackground() { return Color.WHITE; }
+        });
 
         contribPanel = new JPanel();
         contribPanel.setLayout(new BoxLayout(contribPanel, BoxLayout.Y_AXIS));
         contribPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         contribPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        add(titleLabel);
-        add(Box.createRigidArea(new Dimension(0, 3)));
-        add(taskLabel);
-        add(Box.createRigidArea(new Dimension(0, 4)));
-        add(progressBar);
-        add(Box.createRigidArea(new Dimension(0, 6)));
-        add(contribPanel);
+        content.add(titleLabel);
+        content.add(Box.createRigidArea(new Dimension(0, 3)));
+        content.add(taskLabel);
+        content.add(Box.createRigidArea(new Dimension(0, 4)));
+        content.add(progressBar);
+        content.add(Box.createRigidArea(new Dimension(0, 6)));
+        content.add(contribPanel);
+
+        add(header, BorderLayout.NORTH);
+        add(content, BorderLayout.CENTER);
 
         setVisible(false);
+    }
+
+    void setOnClose(Runnable callback) {
+        this.onClose = callback;
     }
 
     void showLoading(int tileId, String description) {

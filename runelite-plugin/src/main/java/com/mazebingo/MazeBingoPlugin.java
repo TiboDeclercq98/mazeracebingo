@@ -63,6 +63,7 @@ public class MazeBingoPlugin extends Plugin {
 
     private final List<ActiveTile> activeTiles = new CopyOnWriteArrayList<>();
     private volatile Map<String, String> tileDescriptions = new HashMap<>();
+    private volatile int selectedTileId = -1;
 
     public List<ActiveTile> getActiveTiles() { return activeTiles; }
 
@@ -83,6 +84,12 @@ public class MazeBingoPlugin extends Plugin {
         executor = Executors.newSingleThreadScheduledExecutor();
         panel.setOnRefresh(() -> executor.execute(this::refreshMazeState));
         panel.setOnTileClick(tile -> {
+            if (selectedTileId == tile.id) {
+                selectedTileId = -1;
+                panel.hideTileInfo();
+                return;
+            }
+            selectedTileId = tile.id;
             String desc = tileDescriptions.getOrDefault(String.valueOf(tile.id), "");
             panel.showTileInfoLoading(tile.id, desc);
             String apiUrl = config.apiUrl();
@@ -94,6 +101,7 @@ public class MazeBingoPlugin extends Plugin {
                 }
             });
         });
+        panel.setOnTileInfoClose(() -> selectedTileId = -1);
 
         navButton = NavigationButton.builder()
             .tooltip("Maze Race Bingo")
@@ -137,6 +145,7 @@ public class MazeBingoPlugin extends Plugin {
             activeTiles.clear();
             xpSnapshot.clear();
             attackedNpcs.clear();
+            selectedTileId = -1;
             panel.clear();
         }
     }
@@ -311,6 +320,15 @@ public class MazeBingoPlugin extends Plugin {
         panel.setStatus("Connected");
         panel.updateMazeState(state);
         panel.updateTiles(activeTiles);
+
+        int selId = selectedTileId;
+        if (selId >= 0) {
+            String desc = tileDescriptions.getOrDefault(String.valueOf(selId), "");
+            TileProgressResponse resp = apiClient.fetchTileProgress(apiUrl, selId, team);
+            if (resp != null) {
+                panel.showTileInfo(resp, desc);
+            }
+        }
     }
 
     private void snapshotXp() {

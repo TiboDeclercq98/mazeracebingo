@@ -174,8 +174,15 @@ public class MazeBingoPlugin extends Plugin {
         if (gained <= 0) return;
 
         String skillName = event.getSkill().getName();
-        List<ActiveTile> matches = matchingTiles("xp_gain", cfg ->
-            cfg.has("skill") && skillName.equalsIgnoreCase(cfg.get("skill").getAsString()));
+        List<ActiveTile> matches = matchingTiles("xp_gain", cfg -> {
+            if (cfg.has("skills") && cfg.get("skills").isJsonArray()) {
+                for (com.google.gson.JsonElement el : cfg.getAsJsonArray("skills")) {
+                    if (skillName.equalsIgnoreCase(el.getAsString())) return true;
+                }
+                return false;
+            }
+            return cfg.has("skill") && skillName.equalsIgnoreCase(cfg.get("skill").getAsString());
+        });
 
         for (ActiveTile tile : matches) {
             submitProgress(tile, gained, skillName);
@@ -206,8 +213,15 @@ public class MazeBingoPlugin extends Plugin {
             String npcName = npc.getName();
             if (npcName == null) continue;
             log.info("Kill detected: npcName='{}'", npcName);
-            List<ActiveTile> matches = matchingTiles("npc_kill", cfg ->
-                cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
+            List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> {
+                if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
+                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
+                        if (npcName.equalsIgnoreCase(el.getAsString())) return true;
+                    }
+                    return false;
+                }
+                return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
+            });
             log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
             if (matches.isEmpty()) {
                 // Tile may have just been revealed but not yet loaded — refresh and retry once

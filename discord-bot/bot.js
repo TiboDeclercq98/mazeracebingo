@@ -90,15 +90,8 @@ client.on('interactionCreate', async interaction => {
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.startsWith('image/png')) {
         const buffer = Buffer.from(await res.arrayBuffer());
-        // Check for boobytrap or chest message header (case-insensitive, log all headers for debug)
-        let specialMsg = res.headers.get('x-boobytrap-message');
-        if (!specialMsg) {
-          specialMsg = res.headers.get('x-chest-message');
-        }
-        if (!specialMsg) {
-          // Try alternate casing (node-fetch sometimes lowercases headers)
-          specialMsg = res.headers.get('X-Boobytrap-Message') || res.headers.get('X-BOOBYTRAP-MESSAGE') || res.headers.get('X-Chest-Message') || res.headers.get('X-CHEST-MESSAGE');
-        }
+        // Check for boobytrap message header (node-fetch lowercases headers)
+        const specialMsg = res.headers.get('x-boobytrap-message') || res.headers.get('X-Boobytrap-Message') || res.headers.get('X-BOOBYTRAP-MESSAGE');
         if (!specialMsg) {
           // Debug: log all headers to help diagnose
           console.log('Headers received:', Object.fromEntries(res.headers.entries()));

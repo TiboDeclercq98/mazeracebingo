@@ -308,6 +308,13 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
     return { error: 'Tile is not revealed (blocked by wall or no adjacent completed tile)', status: 403 };
   }
 
+  if (isEnd && boobytrapPositions.length > 0) {
+    const keysTotal = boobytrapPositions.length;
+    const keysFound = boobytrapPositions.filter(b => mazeState[b.row * SIZE + b.col].completed).length;
+    if (keysFound < keysTotal)
+      return { error: `You have ${keysFound}/${keysTotal} keys`, status: 403 };
+  }
+
   // Record the individual contribution before updating the tile.
   await dbQuery(
     'INSERT INTO tile_progress (tileId, team, playerName, amount, subCategory) VALUES ($1, $2, $3, $4, $5)',
@@ -329,49 +336,14 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
       const row = Math.floor(idx / SIZE);
       const col = idx % SIZE;
 
-      // Boobytrap: increase completionsRequired on a random revealed incomplete tile.
+      // Boobytrap: completing one grants a key required to unlock the end tile.
       const isBoobytrap = boobytrapPositions.some(b => b.row === row && b.col === col);
       if (isBoobytrap) {
-        const revealedSet = computeRevealedSet(mazeState, mazeWalls);
-        const candidates = Array.from(revealedSet).filter(i => {
-          const t = mazeState[i];
-          return !t.completed && t.id !== startId && t.id !== endId;
-        });
-        if (candidates.length > 0) {
-          const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
-          const pickedTile = mazeState[pickIdx];
-          const trapIncrement = taskDefinitions[pickedTile.id]?.taskConfig?.target || 1;
-          pickedTile.completionsRequired = (pickedTile.completionsRequired || 1) + trapIncrement;
-          specialEvent = { type: 'boobytrap', message: `Booby trap triggered: tile ${pickedTile.id} requires extra completion` };
-        }
+        specialEvent = { type: 'boobytrap', message: 'You found a key!' };
       }
 
-      // Dead-end (chest): decrease completionsRequired on a random revealed incomplete tile.
-      const wallObj = mazeWalls.find(w => w.row === row && w.col === col);
-      if (wallObj && id !== startId && id !== endId) {
-        const wallCount = ['top', 'right', 'bottom', 'left'].reduce((n, dir) => n + (wallObj.walls[dir] ? 1 : 0), 0);
-        if (wallCount === 3) {
-          const revealedSet = computeRevealedSet(mazeState, mazeWalls);
-          const candidates = Array.from(revealedSet).filter(i => {
-            const t = mazeState[i];
-            return !t.completed && t.id !== startId && t.id !== endId && (t.completionsRequired || 1) > 0;
-          });
-          if (candidates.length > 0) {
-            const pickIdx = candidates[Math.floor(Math.random() * candidates.length)];
-            mazeState[pickIdx].completionsRequired = (mazeState[pickIdx].completionsRequired || 1) - 1;
-            if (mazeState[pickIdx].completionsRequired <= 0) {
-              mazeState[pickIdx].completionsRequired = 0;
-              mazeState[pickIdx].completed = true;
-              mazeState[pickIdx].completionsDone = 0;
-              specialEvent = { type: 'chest', message: `You found a chest, tile ${mazeState[pickIdx].id} has been completed` };
-            } else {
-              specialEvent = { type: 'chest', message: `You found a chest! Tile ${mazeState[pickIdx].id} needs one less completion` };
-            }
-          }
-        }
-      }
 
-      await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
+await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
     }
   } else {
     await saveMazeToDb(team, mazeState, mazeWalls, boobytrapPositions, tileDescriptions);
@@ -424,7 +396,6 @@ app.post('/api/tiles/complete/:id', async (req, res, next) => {
       res.set('Content-Type', 'image/png');
       if (specialEvent) {
         if (specialEvent.type === 'boobytrap') res.set('X-Boobytrap-Message', specialEvent.message);
-        else if (specialEvent.type === 'chest') res.set('X-Chest-Message', specialEvent.message);
         else if (specialEvent.type === 'gameover') res.set('X-Gameover-Message', specialEvent.message);
       }
       res.send(screenshot);

@@ -28,7 +28,6 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
-import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
@@ -66,7 +65,6 @@ public class MazeBingoPlugin extends Plugin {
     @Inject private ClientToolbar clientToolbar;
     @Inject private ItemManager itemManager;
     @Inject private ChatMessageManager chatMessageManager;
-    @Inject private OverlayManager overlayManager;
     @Inject private MazeEventNotificationOverlay notifOverlay;
 
     private final List<ActiveTile> activeTiles = new CopyOnWriteArrayList<>();
@@ -95,7 +93,6 @@ public class MazeBingoPlugin extends Plugin {
 
     @Override
     protected void startUp() {
-        overlayManager.add(notifOverlay);
         executor = Executors.newSingleThreadScheduledExecutor();
         panel.setOnRefresh(() -> executor.execute(this::refreshMazeState));
         panel.setOnTileClick(tile -> {
@@ -151,7 +148,6 @@ public class MazeBingoPlugin extends Plugin {
         if (executor != null) {
             executor.shutdownNow();
         }
-        overlayManager.remove(notifOverlay);
         clientToolbar.removeNavigation(navButton);
         panel.setOnRefresh(null);
         activeTiles.clear();

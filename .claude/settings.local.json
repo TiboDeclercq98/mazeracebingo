@@ -71,7 +71,8 @@
       "Bash(Select-Object -Property Name)",
       "Bash(Format-Table -AutoSize)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(gh api *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

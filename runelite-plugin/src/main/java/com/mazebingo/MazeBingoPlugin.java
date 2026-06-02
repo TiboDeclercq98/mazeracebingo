@@ -235,8 +235,15 @@ public class MazeBingoPlugin extends Plugin {
     public void onNpcLootReceived(NpcLootReceived event) {
         for (ItemStack stack : event.getItems()) {
             String itemName = itemManager.getItemComposition(stack.getId()).getName();
-            List<ActiveTile> matches = matchingTiles("item_drop", cfg ->
-                cfg.has("item") && itemName.equalsIgnoreCase(cfg.get("item").getAsString()));
+            List<ActiveTile> matches = matchingTiles("item_drop", cfg -> {
+                if (cfg.has("items") && cfg.get("items").isJsonArray()) {
+                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("items")) {
+                        if (itemName.equalsIgnoreCase(el.getAsString())) return true;
+                    }
+                    return false;
+                }
+                return cfg.has("item") && itemName.equalsIgnoreCase(cfg.get("item").getAsString());
+            });
             for (ActiveTile tile : matches) {
                 submitProgress(tile, stack.getQuantity());
             }

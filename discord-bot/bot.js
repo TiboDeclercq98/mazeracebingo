@@ -268,7 +268,7 @@ client.on('interactionCreate', async interaction => {
       let header = `**Tile ${tileId}**`;
       if (data.taskType === 'npc_kill')  header += ` — Kill **${data.taskConfig.npc}** ×${data.target}`;
       if (data.taskType === 'xp_gain')   header += ` — Gain **${data.target.toLocaleString()} ${data.taskConfig.skill} XP**`;
-      if (data.taskType === 'item_drop') header += ` — Receive **${data.taskConfig.item}** from ${data.taskConfig.npc}`;
+      if (data.taskType === 'item_drop') { const items = data.taskConfig.items ?? [data.taskConfig.item]; const itemLabel = items.length > 1 ? items.slice(0, -1).join(', ') + ' or ' + items[items.length - 1] : items[0]; header += ` — Receive **${itemLabel}** from ${data.taskConfig.npc}`; }
       const contribs = data.contributions.length
         ? data.contributions.map(c => `• **${c.playerName}**: ${c.amount}`).join('\n')
         : '_No progress submitted yet._';

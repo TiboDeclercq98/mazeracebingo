@@ -125,9 +125,17 @@ class TileInfoPanel extends JPanel {
                 String skill = cfg.has("skill") ? cfg.get("skill").getAsString() : "?";
                 taskLine = String.format("Gain %,d %s XP — %,d / %,d", data.target, skill, data.currentProgress, data.target);
             } else if ("item_drop".equals(data.taskType)) {
-                String item = cfg.has("item") ? cfg.get("item").getAsString() : "?";
-                String npc  = cfg.has("npc")  ? cfg.get("npc").getAsString()  : "?";
-                taskLine = "Receive " + item + " from " + npc;
+                String itemLabel;
+                if (cfg.has("items") && cfg.get("items").isJsonArray()) {
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("items")) names.add(el.getAsString());
+                    if (names.size() > 1) itemLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
+                    else itemLabel = names.get(0);
+                } else {
+                    itemLabel = cfg.has("item") ? cfg.get("item").getAsString() : "?";
+                }
+                String npc = cfg.has("npc") ? cfg.get("npc").getAsString() : "?";
+                taskLine = "Receive " + itemLabel + " — " + data.currentProgress + " / " + data.target;
             } else {
                 taskLine = "Progress: " + data.currentProgress + " / " + data.target;
             }

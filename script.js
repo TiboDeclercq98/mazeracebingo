@@ -270,9 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             const cfg  = data.taskConfig;
             let taskLine = '';
-            if (data.taskType === 'npc_kill')  taskLine = `Kill <b>${cfg.npc}</b> — ${data.currentProgress} / ${data.target} kills`;
+            if (data.taskType === 'npc_kill')  taskLine = `Kill <b>${data.target} ${cfg.npc}</b> — ${data.currentProgress} / ${data.target}`;
             else if (data.taskType === 'xp_gain')   taskLine = `Gain <b>${data.target.toLocaleString()} ${cfg.skill} XP</b> — ${data.currentProgress.toLocaleString()} / ${data.target.toLocaleString()}`;
-            else if (data.taskType === 'item_drop')  taskLine = `Receive <b>${cfg.item}</b> from ${cfg.npc}`;
+            else if (data.taskType === 'item_drop')  { 
+                const items = cfg.items ?? [cfg.item];
+                const itemLabel = items.length > 1 ? items.slice(0, -1).join(', ') + ' or ' + items[items.length - 1] : items[0];
+                taskLine = `Receive <b>${itemLabel}</b> — ${data.currentProgress} / ${data.target}`; 
+            }
             else taskLine = `Progress: ${data.currentProgress} / ${data.target}`;
             const pct  = Math.min(100, Math.round((data.currentProgress / data.target) * 100));
             const contribRows = data.contributions.length

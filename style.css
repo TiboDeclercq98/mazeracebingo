@@ -186,10 +186,6 @@ body {
     color: #fff !important;
 }
 
-.tile.deadend.clicked {
-    background: orange !important;
-    color: #fff !important;
-}
 
 .tile.wall-top,
 .tile.wall-bottom,
@@ -289,11 +285,6 @@ body {
 }
 
 .tile.boobytrap {
-    color: red !important;
-    font-weight: bold;
-}
-
-.tile.deadend.clicked.boobytrap {
     color: red !important;
     font-weight: bold;
 }

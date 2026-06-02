@@ -9,4 +9,10 @@ public class MazeState {
     public int size;
     public boolean gameOver;
     public Map<String, String> tileDescriptions;
+    public List<BoobyTrapPos> boobytraps;
+
+    public static class BoobyTrapPos {
+        public int row;
+        public int col;
+    }
 }

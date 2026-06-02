@@ -14,13 +14,13 @@ public interface MazeBingoConfig extends Config {
         position = 0
     )
     default String apiUrl() {
-        return "https://mazeracebingo.onrender.com";
+        return "";
     }
 
     @ConfigItem(
         keyName = "teamName",
         name = "Team Name",
-        description = "Your team identifier (matches the ?team= parameter on the website)",
+        description = "Your team identifier",
         position = 1
     )
     default String teamName() {

@@ -97,8 +97,8 @@ public class MazeBingoPanel extends PluginPanel {
         SwingUtilities.invokeLater(() -> tileInfoPanel.showLoading(tileId, description));
     }
 
-    void showTileInfo(TileProgressResponse data, String description) {
-        SwingUtilities.invokeLater(() -> tileInfoPanel.showTile(data, description));
+    void showTileInfo(TileProgressResponse data, String description, boolean isBoobytrap) {
+        SwingUtilities.invokeLater(() -> tileInfoPanel.showTile(data, description, isBoobytrap));
     }
 
     void setSelectedTileOnMap(int tileId) {

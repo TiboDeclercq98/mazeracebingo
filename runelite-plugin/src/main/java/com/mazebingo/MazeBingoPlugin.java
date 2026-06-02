@@ -67,6 +67,7 @@ public class MazeBingoPlugin extends Plugin {
 
     private final List<ActiveTile> activeTiles = new CopyOnWriteArrayList<>();
     private volatile Map<String, String> tileDescriptions = new HashMap<>();
+    private volatile Set<Integer> boobyTrapTileIds = new java.util.HashSet<>();
     private volatile int selectedTileId = -1;
 
     public List<ActiveTile> getActiveTiles() { return activeTiles; }
@@ -102,7 +103,8 @@ public class MazeBingoPlugin extends Plugin {
             executor.execute(() -> {
                 TileProgressResponse resp = apiClient.fetchTileProgress(apiUrl, tile.id, team);
                 if (resp != null) {
-                    panel.showTileInfo(resp, desc);
+                    boolean isBoobytrap = tile.completed && boobyTrapTileIds.contains(tile.id);
+                    panel.showTileInfo(resp, desc, isBoobytrap);
                 }
             });
         });
@@ -355,6 +357,14 @@ public class MazeBingoPlugin extends Plugin {
             tileDescriptions = state.tileDescriptions;
         }
 
+        if (state.boobytraps != null && state.size > 0) {
+            Set<Integer> ids = new java.util.HashSet<>();
+            for (com.mazebingo.model.MazeState.BoobyTrapPos b : state.boobytraps) {
+                ids.add(b.row * state.size + b.col + 1);
+            }
+            boobyTrapTileIds = ids;
+        }
+
         Set<Integer> revealed = MazeRevealCalculator.computeRevealed(state);
         log.info("Revealed indices: {}", revealed);
 
@@ -388,9 +398,11 @@ public class MazeBingoPlugin extends Plugin {
         int selId = selectedTileId;
         if (selId >= 0) {
             String desc = tileDescriptions.getOrDefault(String.valueOf(selId), "");
+            TileData selTile = state.tiles.stream().filter(t -> t.id == selId).findFirst().orElse(null);
+            boolean isBoobytrap = selTile != null && selTile.completed && boobyTrapTileIds.contains(selId);
             TileProgressResponse resp = apiClient.fetchTileProgress(apiUrl, selId, team);
             if (resp != null) {
-                panel.showTileInfo(resp, desc);
+                panel.showTileInfo(resp, desc, isBoobytrap);
             }
         }
     }

@@ -112,8 +112,9 @@ class TileInfoPanel extends JPanel {
         repaint();
     }
 
-    void showTile(TileProgressResponse data, String description) {
+    void showTile(TileProgressResponse data, String description, boolean isBoobytrap) {
         titleLabel.setText("<html>Tile " + data.tileId + (description.isEmpty() ? "" : ": " + description) + "</html>");
+        titleLabel.setForeground(isBoobytrap ? Color.RED : Color.WHITE);
 
         String taskLine;
         if (data.taskConfig != null && data.taskConfig.isJsonObject()) {

@@ -21,6 +21,7 @@ public class MazeEventNotificationOverlay {
 
     @Inject private Client client;
     @Inject private ClientThread clientThread;
+    @Inject private MazeBingoConfig config;
 
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
@@ -42,7 +43,12 @@ public class MazeEventNotificationOverlay {
                     : FIXED_CLASSIC_LAYOUT;
 
                 popupWidgetNode = client.openInterface(componentId, 660, WidgetModalMode.MODAL_CLICKTHROUGH);
-                client.runScript(3343, "Maze Bingo", message, -1);
+                client.runScript(3343, "Maze Race Bingo", message, -1);
+
+                MazeSound sound = config.notificationSound();
+                if (sound != MazeSound.NONE) {
+                    client.playSoundEffect(sound.getId());
+                }
 
                 clientThread.invokeLater(this::tryClearMessage);
             } catch (IllegalStateException ex) {

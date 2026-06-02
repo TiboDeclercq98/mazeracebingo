@@ -11,16 +11,22 @@ import javax.inject.Inject;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 
 public class MazeBingoPanel extends PluginPanel {
 
+    private static final int MAX_EVENTS = 8;
+
     private final JLabel statusLabel;
     private final JPanel tilesPanel;
     private final MazeMapPanel mazeMapPanel;
     private final TileInfoPanel tileInfoPanel;
+    private final JPanel eventFeedPanel;
+    private final Deque<String[]> recentEvents = new ArrayDeque<>();
     private Runnable onRefresh;
 
     @Inject
@@ -66,6 +72,13 @@ public class MazeBingoPanel extends PluginPanel {
         tilesPanel.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR), "Active Tasks"));
 
+        eventFeedPanel = new JPanel();
+        eventFeedPanel.setLayout(new BoxLayout(eventFeedPanel, BoxLayout.Y_AXIS));
+        eventFeedPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        eventFeedPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        eventFeedPanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR), "Recent Events"));
+
         JPanel content = new JPanel();
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -74,6 +87,8 @@ public class MazeBingoPanel extends PluginPanel {
         content.add(Box.createRigidArea(new Dimension(0, 6)));
         content.add(tileInfoPanel);
         content.add(tilesPanel);
+        content.add(Box.createRigidArea(new Dimension(0, 6)));
+        content.add(eventFeedPanel);
 
         add(content, BorderLayout.NORTH);
     }
@@ -144,6 +159,36 @@ public class MazeBingoPanel extends PluginPanel {
         });
     }
 
+    void addEvent(String message, Color color) {
+        SwingUtilities.invokeLater(() -> {
+            String hex = String.format("%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+            if (recentEvents.size() >= MAX_EVENTS) recentEvents.pollFirst();
+            recentEvents.addLast(new String[]{message, hex});
+            rebuildEventFeed();
+        });
+    }
+
+    private void rebuildEventFeed() {
+        eventFeedPanel.removeAll();
+        if (recentEvents.isEmpty()) {
+            JLabel empty = new JLabel("No events yet");
+            empty.setForeground(Color.GRAY);
+            empty.setFont(FontManager.getRunescapeSmallFont());
+            empty.setBorder(new EmptyBorder(4, 6, 4, 6));
+            eventFeedPanel.add(empty);
+        } else {
+            for (String[] entry : recentEvents) {
+                JLabel lbl = new JLabel("<html><body style='width:160px'>" + entry[0] + "</body></html>");
+                lbl.setForeground(Color.decode("#" + entry[1]));
+                lbl.setFont(FontManager.getRunescapeSmallFont());
+                lbl.setBorder(new EmptyBorder(2, 6, 2, 6));
+                eventFeedPanel.add(lbl);
+            }
+        }
+        eventFeedPanel.revalidate();
+        eventFeedPanel.repaint();
+    }
+
     void clear() {
         SwingUtilities.invokeLater(() -> {
             tilesPanel.removeAll();
@@ -151,6 +196,8 @@ public class MazeBingoPanel extends PluginPanel {
             tilesPanel.repaint();
             tileInfoPanel.clear();
             mazeMapPanel.setSelectedTileId(-1);
+            recentEvents.clear();
+            rebuildEventFeed();
             statusLabel.setText("● Not connected");
             statusLabel.setForeground(Color.RED);
         });

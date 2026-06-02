@@ -9,6 +9,7 @@ import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import java.awt.Color;
 import net.runelite.api.GameState;
 import net.runelite.api.NPC;
 import net.runelite.api.Skill;
@@ -312,7 +313,7 @@ public class MazeBingoPlugin extends Plugin {
             sendChatMessage("You contributed " + contrib + " to tile " + tile.id + ".");
 
             if (response.completed) {
-                sendChatMessage("<col=00ff00>You've completed tile " + tile.id + "!</col>");
+                panel.addEvent(playerName + " has completed tile " + tile.id + "!", new Color(76, 175, 80));
             }
 
             if (response.specialEvent != null && response.specialEvent.isJsonObject()) {
@@ -320,8 +321,8 @@ public class MazeBingoPlugin extends Plugin {
                 if (se.has("message")) {
                     String seMsg = se.get("message").getAsString();
                     String seType = se.has("type") ? se.get("type").getAsString() : "";
-                    String color = "gameover".equals(seType) ? "ff0000" : "ffcc00";
-                    sendChatMessage("<col=" + color + ">" + seMsg + "</col>");
+                    Color seColor = "gameover".equals(seType) ? Color.RED : new Color(255, 204, 0);
+                    panel.addEvent(seMsg, seColor);
                 }
             }
 

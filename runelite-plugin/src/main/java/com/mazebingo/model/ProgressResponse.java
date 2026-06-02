@@ -8,4 +8,5 @@ public class ProgressResponse {
     public int target;
     public boolean completed;
     public JsonElement specialEvent;
+    public String error;
 }

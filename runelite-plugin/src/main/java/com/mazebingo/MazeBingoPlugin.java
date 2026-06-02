@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.NPC;
@@ -16,6 +17,8 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.StatChanged;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.game.ItemManager;
@@ -60,6 +63,7 @@ public class MazeBingoPlugin extends Plugin {
     @Inject private MazeBingoPanel panel;
     @Inject private ClientToolbar clientToolbar;
     @Inject private ItemManager itemManager;
+    @Inject private ChatMessageManager chatMessageManager;
 
     private final List<ActiveTile> activeTiles = new CopyOnWriteArrayList<>();
     private volatile Map<String, String> tileDescriptions = new HashMap<>();
@@ -174,7 +178,7 @@ public class MazeBingoPlugin extends Plugin {
             cfg.has("skill") && skillName.equalsIgnoreCase(cfg.get("skill").getAsString()));
 
         for (ActiveTile tile : matches) {
-            submitProgress(tile, gained, null);
+            submitProgress(tile, gained, skillName);
         }
     }
 
@@ -213,12 +217,12 @@ public class MazeBingoPlugin extends Plugin {
                         cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
                     log.info("Retry matched {} tile(s) for npc_kill '{}'", retry.size(), npcName);
                     for (ActiveTile tile : retry) {
-                        submitProgress(tile, 1, null);
+                        submitProgress(tile, 1, npcName);
                     }
                 });
             } else {
                 for (ActiveTile tile : matches) {
-                    submitProgress(tile, 1, null);
+                    submitProgress(tile, 1, npcName);
                 }
             }
         }
@@ -267,7 +271,35 @@ public class MazeBingoPlugin extends Plugin {
                 log.warn("Progress submit for tile {} returned null (API error)", tile.id);
                 return;
             }
+
+            if (response.error != null) {
+                log.warn("Progress submit for tile {} returned error: {}", tile.id, response.error);
+                sendChatMessage("<col=ff0000>" + response.error + "</col>");
+                return;
+            }
+
             log.info("Progress tile {}: progress={}/{} completed={}", tile.id, response.progress, response.target, response.completed);
+
+            String suffix = "xp_gain".equals(tile.taskType) ? " xp"
+                : "npc_kill".equals(tile.taskType) ? (amount == 1 ? " kill" : " kills")
+                : "";
+            String contrib = amount + (subCategory != null ? " " + subCategory : "") + suffix;
+            sendChatMessage("You contributed " + contrib + " to tile " + tile.id + ".");
+
+            if (response.completed) {
+                sendChatMessage("<col=00ff00>You've completed tile " + tile.id + "!</col>");
+            }
+
+            if (response.specialEvent != null && response.specialEvent.isJsonObject()) {
+                JsonObject se = response.specialEvent.getAsJsonObject();
+                if (se.has("message")) {
+                    String seMsg = se.get("message").getAsString();
+                    String seType = se.has("type") ? se.get("type").getAsString() : "";
+                    String color = "gameover".equals(seType) ? "ff0000" : "ffcc00";
+                    sendChatMessage("<col=" + color + ">" + seMsg + "</col>");
+                }
+            }
+
             for (int i = 0; i < activeTiles.size(); i++) {
                 ActiveTile t = activeTiles.get(i);
                 if (t.id == tile.id) {
@@ -280,6 +312,13 @@ public class MazeBingoPlugin extends Plugin {
             panel.updateTiles(activeTiles);
             refreshMazeState();
         });
+    }
+
+    private void sendChatMessage(String message) {
+        chatMessageManager.queue(QueuedMessage.builder()
+            .type(ChatMessageType.GAMEMESSAGE)
+            .runeLiteFormattedMessage(message)
+            .build());
     }
 
     void refreshMazeState() {

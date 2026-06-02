@@ -60,11 +60,15 @@ public class MazeApiClient {
         RequestBody requestBody = RequestBody.create(JSON_MEDIA_TYPE, gson.toJson(body));
         Request request = new Request.Builder().url(url).post(requestBody).build();
         try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                log.warn("Progress POST for tile {} returned {}", tileId, response.code());
+            if (response.body() == null) {
+                log.warn("Progress POST for tile {} returned {} with no body", tileId, response.code());
                 return null;
             }
-            return gson.fromJson(response.body().charStream(), ProgressResponse.class);
+            ProgressResponse result = gson.fromJson(response.body().charStream(), ProgressResponse.class);
+            if (!response.isSuccessful()) {
+                log.warn("Progress POST for tile {} returned {}", tileId, response.code());
+            }
+            return result;
         } catch (Exception e) {
             log.warn("Failed to post progress for tile {}", tileId, e);
             return null;

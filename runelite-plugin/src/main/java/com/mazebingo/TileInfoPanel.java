@@ -120,11 +120,27 @@ class TileInfoPanel extends JPanel {
         if (data.taskConfig != null && data.taskConfig.isJsonObject()) {
             JsonObject cfg = data.taskConfig.getAsJsonObject();
             if ("npc_kill".equals(data.taskType)) {
-                String npc = cfg.has("npc") ? cfg.get("npc").getAsString() : "?";
-                taskLine = String.format("Kill %s — %d / %d kills", npc, data.currentProgress, data.target);
+                String npcLabel;
+                if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) names.add(el.getAsString());
+                    if (names.size() > 1) npcLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
+                    else npcLabel = names.get(0);
+                } else {
+                    npcLabel = cfg.has("npc") ? cfg.get("npc").getAsString() : "?";
+                }
+                taskLine = String.format("Kill %s — %d / %d kills", npcLabel, data.currentProgress, data.target);
             } else if ("xp_gain".equals(data.taskType)) {
-                String skill = cfg.has("skill") ? cfg.get("skill").getAsString() : "?";
-                taskLine = String.format("Gain %,d %s XP — %,d / %,d", data.target, skill, data.currentProgress, data.target);
+                String skillLabel;
+                if (cfg.has("skills") && cfg.get("skills").isJsonArray()) {
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("skills")) names.add(el.getAsString());
+                    if (names.size() > 1) skillLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
+                    else skillLabel = names.get(0);
+                } else {
+                    skillLabel = cfg.has("skill") ? cfg.get("skill").getAsString() : "?";
+                }
+                taskLine = String.format("Gain %,d %s XP — %,d / %,d", data.target, skillLabel, data.currentProgress, data.target);
             } else if ("item_drop".equals(data.taskType)) {
                 String itemLabel;
                 if (cfg.has("items") && cfg.get("items").isJsonArray()) {

@@ -441,8 +441,9 @@ public class MazeBingoPlugin extends Plugin {
             } else {
                 for (com.mazebingo.model.MazeEventEntry e : state.recentEvents) {
                     if (e.id > lastSeenEventId) {
-                        Color color = "gameover".equals(e.type) ? Color.RED
-                            : "tile_complete".equals(e.type) ? new Color(76, 175, 80)
+                        Color color = "tile_complete".equals(e.type) ? Color.WHITE
+                            : "keys_missing".equals(e.type) ? Color.RED
+                            : "gameover".equals(e.type) ? new Color(76, 175, 80)
                             : new Color(255, 204, 0);
                         panel.addEvent(e.message, color);
                         notifOverlay.addNotification(e.message, color);

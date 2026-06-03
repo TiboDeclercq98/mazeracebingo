@@ -328,8 +328,10 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
   if (isEnd && boobytrapPositions.length > 0) {
     const keysTotal = boobytrapPositions.length;
     const keysFound = boobytrapPositions.filter(b => mazeState[b.row * SIZE + b.col].completed).length;
-    if (keysFound < keysTotal)
+    if (keysFound < keysTotal) {
+      await insertTeamEvent(team, playerName, id, 'keys_missing', `${playerName} only has ${keysFound}/${keysTotal} keys`);
       return { error: `You have ${keysFound}/${keysTotal} keys`, status: 403 };
+    }
   }
 
   // Record the individual contribution before updating the tile.

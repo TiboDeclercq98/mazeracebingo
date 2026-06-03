@@ -4,7 +4,8 @@ public enum MazeSound {
     NONE("None"),
     SHORT_DOG_BARK("Short dog bark"),
     WHIP("Whip"),
-    BOBER("Bober");
+    BOBER("Bober"),
+    SAD_SOUND("Sad sound");
 
     private final String displayName;
 

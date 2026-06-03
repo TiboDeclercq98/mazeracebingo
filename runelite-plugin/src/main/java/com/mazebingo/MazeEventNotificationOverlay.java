@@ -53,8 +53,9 @@ public class MazeEventNotificationOverlay {
 
                 String lowerMsg = message.toLowerCase();
                 MazeSound sound = lowerMsg.contains("end tile was completed") ? MazeSound.BOBER
-                    : lowerMsg.contains("keys") ? MazeSound.WHIP
-                    : MazeSound.SHORT_DOG_BARK;
+                    : lowerMsg.contains("has found a key") ? MazeSound.WHIP
+                    : lowerMsg.contains("keys") ? MazeSound.SAD_SOUND:
+                    MazeSound.SHORT_DOG_BARK;
                 InputStream stream = SoundGenerator.generate(sound);
                 if (stream != null) {
                     try {

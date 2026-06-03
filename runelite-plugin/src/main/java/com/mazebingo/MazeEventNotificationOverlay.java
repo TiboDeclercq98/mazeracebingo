@@ -52,7 +52,7 @@ public class MazeEventNotificationOverlay {
                 client.runScript(3343, "Maze Race Bingo", message, -1);
 
                 String lowerMsg = message.toLowerCase();
-                MazeSound sound = lowerMsg.contains("end tile was completed") ? MazeSound.BOBER
+                MazeSound sound = lowerMsg.contains("completed the end tile") ? MazeSound.BOBER
                     : lowerMsg.contains("has found a key") ? MazeSound.WHIP
                     : lowerMsg.contains("keys") ? MazeSound.SAD_SOUND:
                     MazeSound.SHORT_DOG_BARK;

@@ -309,6 +309,7 @@ public class MazeBingoPlugin extends Plugin {
             if (response.error != null) {
                 log.warn("Progress submit for tile {} returned error: {}", tile.id, response.error);
                 sendChatMessage("<col=ff0000>" + response.error + "</col>");
+                refreshMazeState();
                 return;
             }
 

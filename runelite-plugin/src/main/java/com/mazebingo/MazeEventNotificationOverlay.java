@@ -51,7 +51,10 @@ public class MazeEventNotificationOverlay {
                 popupWidgetNode = client.openInterface(componentId, 660, WidgetModalMode.MODAL_CLICKTHROUGH);
                 client.runScript(3343, "Maze Race Bingo", message, -1);
 
-                MazeSound sound = message.toLowerCase().contains("you found a key") ? MazeSound.WHIP : MazeSound.SHORT_DOG_BARK;
+                String lowerMsg = message.toLowerCase();
+                MazeSound sound = lowerMsg.contains("end tile was completed") ? MazeSound.BOBER
+                    : lowerMsg.contains("keys") ? MazeSound.WHIP
+                    : MazeSound.SHORT_DOG_BARK;
                 InputStream stream = SoundGenerator.generate(sound);
                 if (stream != null) {
                     try {

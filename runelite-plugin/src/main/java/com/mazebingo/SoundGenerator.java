@@ -18,6 +18,7 @@ class SoundGenerator {
         switch (sound) {
             case SHORT_DOG_BARK: return loadWav("/com/mazebingo/sounds/short-dog-bark.wav");
             case WHIP:            return loadWav("/com/mazebingo/sounds/whip.wav");
+            case BOBER:           return loadWav("/com/mazebingo/sounds/bober_kurwa.wav");
             default:             return null;
         }
     }

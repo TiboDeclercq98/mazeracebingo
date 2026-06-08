@@ -73,7 +73,9 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(gh api *)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -Directory -Name)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -Directory -Name)",
+      "Bash(xargs grep -l \"task\")",
+      "WebFetch(domain:api.github.com)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

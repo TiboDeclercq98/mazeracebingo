@@ -18,6 +18,11 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.Item;
+import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.eventbus.Subscribe;
@@ -80,6 +85,14 @@ public class MazeBingoPlugin extends Plugin {
 
     // NPC kill tracking: npcIndex → NPC reference for every NPC the player has hit
     private final Map<Integer, NPC> attackedNpcs = new HashMap<>();
+
+    private static final int TOB_REGION_1 = 12867;
+    private static final int TOB_REGION_2 = 14642;
+    private volatile int pendingChestContainerId = -1;
+
+    // player inventory container ID (net.runelite.api.InventoryID.INVENTORY)
+    private static final int PLAYER_INVENTORY_ID = 93;
+    private volatile Map<Integer, Integer> gauntletInventorySnapshot = null;
 
 
     private ScheduledExecutorService executor;
@@ -153,6 +166,7 @@ public class MazeBingoPlugin extends Plugin {
         activeTiles.clear();
         xpSnapshot.clear();
         attackedNpcs.clear();
+        pendingChestContainerId = -1;
         lastKnownVersion = null;
         lastSeenEventId = 0;
         eventsInitialized = false;
@@ -170,6 +184,7 @@ public class MazeBingoPlugin extends Plugin {
             activeTiles.clear();
             xpSnapshot.clear();
             attackedNpcs.clear();
+            pendingChestContainerId = -1;
             selectedTileId = -1;
             lastKnownVersion = null;
             lastSeenEventId = 0;
@@ -267,7 +282,7 @@ public class MazeBingoPlugin extends Plugin {
         attackedNpcs.remove(event.getNpc().getIndex());
     }
 
-    // --- Item drops ---
+    // --- Item drops / chest loot ---
 
     @Subscribe
     public void onNpcLootReceived(NpcLootReceived event) {
@@ -285,6 +300,79 @@ public class MazeBingoPlugin extends Plugin {
             for (ActiveTile tile : matches) {
                 submitProgress(tile, stack.getQuantity(), itemName);
             }
+        }
+    }
+
+    @Subscribe
+    public void onWidgetLoaded(WidgetLoaded event) {
+        int groupId = event.getGroupId();
+        if (groupId == InterfaceID.RAIDS_REWARDS) {
+            pendingChestContainerId = InventoryID.RAIDS_REWARDS;
+        } else if (groupId == InterfaceID.TOB_CHESTS) {
+            int region = client.getLocalPlayer() != null
+                ? client.getLocalPlayer().getWorldLocation().getRegionID() : -1;
+            if (region == TOB_REGION_1 || region == TOB_REGION_2) {
+                pendingChestContainerId = InventoryID.TOB_CHESTS;
+            }
+        } else if (groupId == InterfaceID.TOA_CHESTS) {
+            pendingChestContainerId = InventoryID.TOA_CHESTS;
+        } else if (groupId == InterfaceID.GAUNTLET_SCOREBOARD) {
+            captureGauntletInventorySnapshot();
+        }
+    }
+
+    @Subscribe
+    public void onItemContainerChanged(ItemContainerChanged event) {
+        // Raids chest loot
+        if (pendingChestContainerId >= 0 && event.getContainerId() == pendingChestContainerId) {
+            pendingChestContainerId = -1;
+            for (Item item : event.getItemContainer().getItems()) {
+                if (item.getId() <= 0) continue;
+                String itemName = itemManager.getItemComposition(item.getId()).getName();
+                checkLootItem(itemName, item.getQuantity() > 0 ? item.getQuantity() : 1);
+            }
+        }
+
+        // Gauntlet chest loot — inventory diff after boss scoreboard fires
+        Map<Integer, Integer> snap = gauntletInventorySnapshot;
+        if (snap != null && event.getContainerId() == PLAYER_INVENTORY_ID) {
+            gauntletInventorySnapshot = null;
+            for (Item item : event.getItemContainer().getItems()) {
+                if (item.getId() <= 0) continue;
+                int gained = item.getQuantity() - snap.getOrDefault(item.getId(), 0);
+                if (gained > 0) {
+                    String itemName = itemManager.getItemComposition(item.getId()).getName();
+                    checkLootItem(itemName, gained);
+                }
+            }
+        }
+    }
+
+    private void captureGauntletInventorySnapshot() {
+        net.runelite.api.ItemContainer inv = client.getItemContainer(PLAYER_INVENTORY_ID);
+        Map<Integer, Integer> snapshot = new HashMap<>();
+        if (inv != null) {
+            for (Item item : inv.getItems()) {
+                if (item.getId() > 0) {
+                    snapshot.merge(item.getId(), item.getQuantity(), Integer::sum);
+                }
+            }
+        }
+        gauntletInventorySnapshot = snapshot;
+    }
+
+    private void checkLootItem(String itemName, int quantity) {
+        List<ActiveTile> matches = matchingTiles("loot_item", cfg -> {
+            if (cfg.has("items") && cfg.get("items").isJsonArray()) {
+                for (com.google.gson.JsonElement el : cfg.getAsJsonArray("items")) {
+                    if (itemName.equalsIgnoreCase(el.getAsString())) return true;
+                }
+                return false;
+            }
+            return cfg.has("item") && itemName.equalsIgnoreCase(cfg.get("item").getAsString());
+        });
+        for (ActiveTile tile : matches) {
+            submitProgress(tile, quantity, itemName);
         }
     }
 

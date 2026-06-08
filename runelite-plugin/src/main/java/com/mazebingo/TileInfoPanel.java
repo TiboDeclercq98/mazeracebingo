@@ -141,7 +141,7 @@ class TileInfoPanel extends JPanel {
                     skillLabel = cfg.has("skill") ? cfg.get("skill").getAsString() : "?";
                 }
                 taskLine = String.format("Gain %,d %s XP — %,d / %,d", data.target, skillLabel, data.currentProgress, data.target);
-            } else if ("item_drop".equals(data.taskType)) {
+            } else if ("item_drop".equals(data.taskType) || "loot_item".equals(data.taskType)) {
                 String itemLabel;
                 if (cfg.has("items") && cfg.get("items").isJsonArray()) {
                     java.util.List<String> names = new java.util.ArrayList<>();

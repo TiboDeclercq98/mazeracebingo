@@ -279,12 +279,12 @@ public class MazeBingoPlugin extends Plugin {
     @Subscribe
     public void onNpcDespawned(NpcDespawned event) {
         NPC npc = event.getNpc();
-        // If the NPC died outside render distance, checkDeadNpcs() never sees isDead()==true.
-        // Process the kill here before removing it from the tracked set.
-        if (npc.isDead() && attackedNpcs.containsKey(npc.getIndex())) {
+        // checkDeadNpcs() removes in-range kills from attackedNpcs before despawn fires.
+        // If the NPC is still here when it despawns, the client never saw it die (out-of-range death).
+        if (attackedNpcs.remove(npc.getIndex()) != null && !npc.isDead()) {
             String npcName = npc.getName();
             if (npcName != null) {
-                log.info("Kill detected on despawn (out-of-range death): npcName='{}'", npcName);
+                log.info("Kill detected on despawn (out-of-range): npcName='{}'", npcName);
                 List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> {
                     if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
                         for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
@@ -317,7 +317,6 @@ public class MazeBingoPlugin extends Plugin {
                 }
             }
         }
-        attackedNpcs.remove(npc.getIndex());
     }
 
     // --- Item drops / chest loot ---

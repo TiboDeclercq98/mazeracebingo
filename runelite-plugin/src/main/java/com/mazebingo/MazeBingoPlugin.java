@@ -23,7 +23,6 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.plugins.loottracker.LootReceived;
-import net.runelite.http.api.loottracker.LootRecordType;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.plugins.Plugin;
@@ -82,6 +81,10 @@ public class MazeBingoPlugin extends Plugin {
 
     // NPC kill tracking: npcIndex → NPC reference for every NPC the player has hit
     private final Map<Integer, NPC> attackedNpcs = new HashMap<>();
+
+    // Dedup: "tileId:itemName" → game tick of last submit; prevents double-counting when
+    // both onNpcLootReceived and onLootReceived fire for the same NPC kill
+    private final Map<String, Integer> recentSubmits = new HashMap<>();
 
     private ScheduledExecutorService executor;
     private ScheduledFuture<?> pollTask;
@@ -154,6 +157,7 @@ public class MazeBingoPlugin extends Plugin {
         activeTiles.clear();
         xpSnapshot.clear();
         attackedNpcs.clear();
+        recentSubmits.clear();
         lastKnownVersion = null;
         lastSeenEventId = 0;
         eventsInitialized = false;
@@ -171,6 +175,7 @@ public class MazeBingoPlugin extends Plugin {
             activeTiles.clear();
             xpSnapshot.clear();
             attackedNpcs.clear();
+            recentSubmits.clear();
             selectedTileId = -1;
             lastKnownVersion = null;
             lastSeenEventId = 0;
@@ -226,6 +231,7 @@ public class MazeBingoPlugin extends Plugin {
     }
 
     private void checkDeadNpcs() {
+        recentSubmits.entrySet().removeIf(e -> client.getTickCount() - e.getValue() > 1);
         Iterator<Map.Entry<Integer, NPC>> it = attackedNpcs.entrySet().iterator();
         while (it.hasNext()) {
             NPC npc = it.next().getValue();
@@ -291,8 +297,6 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onLootReceived(LootReceived event) {
-        // NPC kills are already handled by onNpcLootReceived — skip to avoid double-counting
-        if (event.getType() == LootRecordType.NPC) return;
         for (ItemStack stack : event.getItems()) {
             String itemName = itemManager.getItemComposition(stack.getId()).getName();
             List<ActiveTile> matches = matchingTiles("item_drop", cfg -> {
@@ -320,6 +324,12 @@ public class MazeBingoPlugin extends Plugin {
         String apiUrl = config.apiUrl();
         String team = config.teamName();
         if (team.isEmpty()) return;
+
+        String dedupKey = tile.id + ":" + subCategory;
+        int currentTick = client.getTickCount();
+        Integer lastTick = recentSubmits.get(dedupKey);
+        if (lastTick != null && currentTick - lastTick <= 1) return;
+        recentSubmits.put(dedupKey, currentTick);
 
         executor.execute(() -> {
             ProgressResponse response = apiClient.postProgress(apiUrl, tile.id, playerName, amount, team, subCategory);

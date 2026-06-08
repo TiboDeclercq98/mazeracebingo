@@ -278,45 +278,7 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onNpcDespawned(NpcDespawned event) {
-        NPC npc = event.getNpc();
-        // checkDeadNpcs() removes in-range kills from attackedNpcs before despawn fires.
-        // If the NPC is still here when it despawns, the client never saw it die (out-of-range death).
-        if (attackedNpcs.remove(npc.getIndex()) != null && !npc.isDead()) {
-            String npcName = npc.getName();
-            if (npcName != null) {
-                log.info("Kill detected on despawn (out-of-range): npcName='{}'", npcName);
-                List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> {
-                    if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
-                        for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
-                            if (npcName.equalsIgnoreCase(el.getAsString())) return true;
-                        }
-                        return false;
-                    }
-                    return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
-                });
-                if (matches.isEmpty()) {
-                    executor.execute(() -> {
-                        refreshMazeState();
-                        List<ActiveTile> retry = matchingTiles("npc_kill", cfg -> {
-                            if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
-                                for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
-                                    if (npcName.equalsIgnoreCase(el.getAsString())) return true;
-                                }
-                                return false;
-                            }
-                            return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
-                        });
-                        for (ActiveTile tile : retry) {
-                            submitProgress(tile, 1, npcName);
-                        }
-                    });
-                } else {
-                    for (ActiveTile tile : matches) {
-                        submitProgress(tile, 1, npcName);
-                    }
-                }
-            }
-        }
+        attackedNpcs.remove(event.getNpc().getIndex());
     }
 
     // --- Item drops / chest loot ---

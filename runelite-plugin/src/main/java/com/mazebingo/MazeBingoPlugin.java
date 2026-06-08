@@ -254,8 +254,15 @@ public class MazeBingoPlugin extends Plugin {
                 // Tile may have just been revealed but not yet loaded — refresh and retry once
                 executor.execute(() -> {
                     refreshMazeState();
-                    List<ActiveTile> retry = matchingTiles("npc_kill", cfg ->
-                        cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString()));
+                    List<ActiveTile> retry = matchingTiles("npc_kill", cfg -> {
+                        if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
+                            for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
+                                if (npcName.equalsIgnoreCase(el.getAsString())) return true;
+                            }
+                            return false;
+                        }
+                        return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
+                    });
                     log.info("Retry matched {} tile(s) for npc_kill '{}'", retry.size(), npcName);
                     for (ActiveTile tile : retry) {
                         submitProgress(tile, 1, npcName);
@@ -271,7 +278,46 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onNpcDespawned(NpcDespawned event) {
-        attackedNpcs.remove(event.getNpc().getIndex());
+        NPC npc = event.getNpc();
+        // If the NPC died outside render distance, checkDeadNpcs() never sees isDead()==true.
+        // Process the kill here before removing it from the tracked set.
+        if (npc.isDead() && attackedNpcs.containsKey(npc.getIndex())) {
+            String npcName = npc.getName();
+            if (npcName != null) {
+                log.info("Kill detected on despawn (out-of-range death): npcName='{}'", npcName);
+                List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> {
+                    if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
+                        for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
+                            if (npcName.equalsIgnoreCase(el.getAsString())) return true;
+                        }
+                        return false;
+                    }
+                    return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
+                });
+                if (matches.isEmpty()) {
+                    executor.execute(() -> {
+                        refreshMazeState();
+                        List<ActiveTile> retry = matchingTiles("npc_kill", cfg -> {
+                            if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
+                                for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
+                                    if (npcName.equalsIgnoreCase(el.getAsString())) return true;
+                                }
+                                return false;
+                            }
+                            return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
+                        });
+                        for (ActiveTile tile : retry) {
+                            submitProgress(tile, 1, npcName);
+                        }
+                    });
+                } else {
+                    for (ActiveTile tile : matches) {
+                        submitProgress(tile, 1, npcName);
+                    }
+                }
+            }
+        }
+        attackedNpcs.remove(npc.getIndex());
     }
 
     // --- Item drops / chest loot ---

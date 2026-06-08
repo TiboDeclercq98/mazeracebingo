@@ -9,6 +9,7 @@ import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.events.ChatMessage;
 import java.awt.Color;
 import net.runelite.api.GameState;
 import net.runelite.api.NPC;
@@ -281,6 +282,39 @@ public class MazeBingoPlugin extends Plugin {
         attackedNpcs.remove(event.getNpc().getIndex());
     }
 
+    // --- Agility laps & minigame completions ---
+
+    @Subscribe
+    public void onChatMessage(ChatMessage event) {
+        ChatMessageType type = event.getType();
+        if (type != ChatMessageType.SPAM && type != ChatMessageType.GAMEMESSAGE) return;
+
+        String msg = event.getMessage().replaceAll("<[^>]*>", "");
+
+        if (type == ChatMessageType.SPAM && msg.startsWith("You have completed a lap of the ")) {
+            String courseName = msg.substring("You have completed a lap of the ".length());
+            if (courseName.endsWith(".")) courseName = courseName.substring(0, courseName.length() - 1);
+            final String course = courseName;
+            List<ActiveTile> matches = matchingTiles("agility_lap", cfg -> {
+                if (!cfg.has("course")) return true;
+                return course.toLowerCase().contains(cfg.get("course").getAsString().toLowerCase());
+            });
+            for (ActiveTile tile : matches) {
+                submitProgress(tile, 1, course);
+            }
+        }
+
+        List<ActiveTile> minigameMatches = matchingTiles("minigame_completion", cfg -> {
+            if (!cfg.has("message")) return false;
+            return msg.toLowerCase().contains(cfg.get("message").getAsString().toLowerCase());
+        });
+        for (ActiveTile tile : minigameMatches) {
+            String minigameName = tile.taskConfig.has("minigame")
+                ? tile.taskConfig.get("minigame").getAsString() : null;
+            submitProgress(tile, 1, minigameName);
+        }
+    }
+
     // --- Item drops / chest loot ---
 
     @Subscribe
@@ -356,6 +390,8 @@ public class MazeBingoPlugin extends Plugin {
 
             String suffix = "xp_gain".equals(tile.taskType) ? " xp"
                 : "npc_kill".equals(tile.taskType) ? (amount == 1 ? " kill" : " kills")
+                : "agility_lap".equals(tile.taskType) ? " lap"
+                : "minigame_completion".equals(tile.taskType) ? " completion"
                 : "";
             String contrib = amount + (subCategory != null ? " " + subCategory : "") + suffix;
             sendChatMessage("You contributed " + contrib + " to tile " + tile.id + ".");

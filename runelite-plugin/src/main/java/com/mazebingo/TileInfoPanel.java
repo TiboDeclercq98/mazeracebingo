@@ -152,6 +152,13 @@ class TileInfoPanel extends JPanel {
                     itemLabel = cfg.has("item") ? cfg.get("item").getAsString() : "?";
                 }
                 taskLine = "Receive " + itemLabel + " — " + data.currentProgress + " / " + data.target;
+            } else if ("agility_lap".equals(data.taskType)) {
+                String courseLabel = cfg.has("course") ? cfg.get("course").getAsString() : "rooftop course";
+                taskLine = String.format("Complete laps of %s — %d / %d laps", courseLabel, data.currentProgress, data.target);
+            } else if ("minigame_completion".equals(data.taskType)) {
+                String minigameLabel = cfg.has("minigame") ? cfg.get("minigame").getAsString()
+                    : cfg.has("message") ? cfg.get("message").getAsString() : "minigame";
+                taskLine = String.format("Complete %s — %d / %d", minigameLabel, data.currentProgress, data.target);
             } else {
                 taskLine = "Progress: " + data.currentProgress + " / " + data.target;
             }
@@ -164,6 +171,10 @@ class TileInfoPanel extends JPanel {
         progressBar.setValue(pct);
         progressBar.setString("xp_gain".equals(data.taskType)
             ? String.format("%,d / %,d xp", data.currentProgress, data.target)
+            : "agility_lap".equals(data.taskType)
+            ? data.currentProgress + " / " + data.target + " laps"
+            : "minigame_completion".equals(data.taskType)
+            ? data.currentProgress + " / " + data.target + " completions"
             : data.currentProgress + " / " + data.target);
 
         contribPanel.removeAll();

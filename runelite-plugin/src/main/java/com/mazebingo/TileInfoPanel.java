@@ -171,10 +171,6 @@ class TileInfoPanel extends JPanel {
         progressBar.setValue(pct);
         progressBar.setString("xp_gain".equals(data.taskType)
             ? String.format("%,d / %,d xp", data.currentProgress, data.target)
-            : "agility_lap".equals(data.taskType)
-            ? data.currentProgress + " / " + data.target + " laps"
-            : "minigame_completion".equals(data.taskType)
-            ? data.currentProgress + " / " + data.target + " completions"
             : data.currentProgress + " / " + data.target);
 
         contribPanel.removeAll();

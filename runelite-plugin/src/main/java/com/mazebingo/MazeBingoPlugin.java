@@ -291,10 +291,12 @@ public class MazeBingoPlugin extends Plugin {
 
         String msg = event.getMessage().replaceAll("<[^>]*>", "");
 
-        if (type == ChatMessageType.SPAM && msg.startsWith("You have completed a lap of the ")) {
-            String courseName = msg.substring("You have completed a lap of the ".length());
-            if (courseName.endsWith(".")) courseName = courseName.substring(0, courseName.length() - 1);
-            final String course = courseName;
+        // "Your Draynor Village Rooftop lap count is: 2."
+        if (type == ChatMessageType.SPAM && msg.contains("Rooftop lap count is:")) {
+            String withoutYour = msg.startsWith("Your ") ? msg.substring("Your ".length()) : msg;
+            int rooftopIdx = withoutYour.indexOf(" Rooftop lap count is:");
+            final String course = rooftopIdx > 0 ? withoutYour.substring(0, rooftopIdx) : "";
+            log.info("Agility lap detected: course='{}'", course);
             List<ActiveTile> matches = matchingTiles("agility_lap", cfg -> {
                 if (!cfg.has("course")) return true;
                 return course.toLowerCase().contains(cfg.get("course").getAsString().toLowerCase());

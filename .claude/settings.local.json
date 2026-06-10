@@ -76,7 +76,15 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -Directory -Name)",
       "Bash(xargs grep -l \"task\")",
       "WebFetch(domain:api.github.com)",
-      "Bash(curl -s \"https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/plugins/agility/Courses.java\")"
+      "Bash(curl -s \"https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/plugins/agility/Courses.java\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/runelite/runelite/master/runelite-api/src/main/java/net/runelite/api/VarbitID.java\")",
+      "Bash(curl -I \"https://raw.githubusercontent.com/runelite/runelite/master/runelite-api/src/main/java/net/runelite/api/VarbitID.java\")",
+      "Bash(curl -s \"https://api.github.com/repos/runelite/runelite/contents/runelite-api/src/main/java/net/runelite/api\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/runelite/runelite/master/runelite-api/src/main/java/net/runelite/api/Varbits.java\")",
+      "PowerShell($url = \"https://raw.githubusercontent.com/runelite/runelite/master/runelite-api/src/main/java/net/runelite/api/VarbitID.java\"; $content = \\(Invoke-WebRequest -Uri $url -ErrorAction Stop\\).Content; $lines = $content -split \"`n\"; $lines | Where-Object {$_ -match '\\(?i\\)wyrm|varlamore'})",
+      "PowerShell($url = \"https://api.github.com/repos/runelite/runelite/contents/runelite-api/src/main/java/net/runelite/api/VarbitID.java\"; try { $response = Invoke-WebRequest -Uri $url -ErrorAction Stop; $json = $response.Content | ConvertFrom-Json; $content = [System.Text.Encoding]::UTF8.GetString\\([System.Convert]::FromBase64String\\($json.content\\)\\); $lines = $content -split \"`n\"; $lines | Where-Object {$_ -match '\\(?i\\)wyrm|varlamore'} } catch { \"Error: $_\" })",
+      "PowerShell($url = \"https://api.github.com/search/code?q=filename:VarbitID.java+repo:runelite/runelite\"; try { $response = Invoke-WebRequest -Uri $url -ErrorAction Stop; $json = $response.Content | ConvertFrom-Json; $json.items | ForEach-Object { \"Path: $\\($_.path\\)\"; \"URL: $\\($_.html_url\\)\" } } catch { \"Error: $_\" })",
+      "PowerShell($url = \"https://raw.githubusercontent.com/runelite/runelite/master/runelite-api/src/main/java/net/runelite/api/VarbitID.java\"; $webClient = New-Object System.Net.WebClient; try { $content = $webClient.DownloadString\\($url\\); $lines = $content -split \"`n\"; $lines | Where-Object {$_ -match '\\(?i\\)wyrm|varlamore'} | Select-Object -First 50 } catch { \"Error: $\\($_.Exception.Message\\)\" })"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

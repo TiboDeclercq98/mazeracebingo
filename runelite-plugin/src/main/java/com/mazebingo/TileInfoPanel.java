@@ -153,7 +153,15 @@ class TileInfoPanel extends JPanel {
                 }
                 taskLine = "Receive " + itemLabel + " — " + data.currentProgress + " / " + data.target;
             } else if ("agility_lap".equals(data.taskType)) {
-                String courseLabel = cfg.has("course") ? cfg.get("course").getAsString() : "rooftop course";
+                String courseLabel;
+                if (cfg.has("courses") && cfg.get("courses").isJsonArray()) {
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("courses")) names.add(el.getAsString());
+                    if (names.size() > 1) courseLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
+                    else courseLabel = names.get(0);
+                } else {
+                    courseLabel = cfg.has("course") ? cfg.get("course").getAsString() : "any course";
+                }
                 taskLine = String.format("Complete laps of %s — %d / %d laps", courseLabel, data.currentProgress, data.target);
             } else if ("minigame_completion".equals(data.taskType)) {
                 String minigameLabel = cfg.has("minigame") ? cfg.get("minigame").getAsString()

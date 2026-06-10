@@ -253,10 +253,8 @@ public class MazeBingoPlugin extends Plugin {
                 if (loc.getX() == ep[0] && loc.getY() == ep[1] && loc.getPlane() == ep[2]) {
                     String courseName = entry.getKey();
                     log.info("Agility lap detected: course='{}'", courseName);
-                    List<ActiveTile> matches = matchingTiles("agility_lap", cfg -> {
-                        if (!cfg.has("course")) return true;
-                        return courseName.toLowerCase().contains(cfg.get("course").getAsString().toLowerCase());
-                    });
+                    List<ActiveTile> matches = matchingTiles("agility_lap",
+                        cfg -> courseMatchesTile(cfg, courseName));
                     for (ActiveTile tile : matches) {
                         submitProgress(tile, 1, courseName);
                     }
@@ -264,6 +262,17 @@ public class MazeBingoPlugin extends Plugin {
                 }
             }
         }
+    }
+
+    private static boolean courseMatchesTile(JsonObject cfg, String courseName) {
+        if (cfg.has("courses") && cfg.get("courses").isJsonArray()) {
+            for (com.google.gson.JsonElement el : cfg.getAsJsonArray("courses")) {
+                if (courseName.toLowerCase().contains(el.getAsString().toLowerCase())) return true;
+            }
+            return false;
+        }
+        if (!cfg.has("course")) return true;
+        return courseName.toLowerCase().contains(cfg.get("course").getAsString().toLowerCase());
     }
 
     // --- NPC kills ---

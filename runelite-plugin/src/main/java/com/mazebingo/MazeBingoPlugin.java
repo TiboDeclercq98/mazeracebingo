@@ -9,6 +9,7 @@ import com.mazebingo.model.ProgressResponse;
 import com.mazebingo.model.TileData;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
 import java.awt.Color;
 import net.runelite.api.GameState;
@@ -59,6 +60,30 @@ import java.util.stream.Collectors;
 public class MazeBingoPlugin extends Plugin {
 
     private static final Logger log = LoggerFactory.getLogger(MazeBingoPlugin.class);
+
+    private static final Map<String, int[][]> COURSE_ENDPOINTS;
+    static {
+        Map<String, int[][]> m = new java.util.LinkedHashMap<>();
+        m.put("Gnome", new int[][]{{2484, 3437, 0}, {2487, 3437, 0}});
+        m.put("Draynor", new int[][]{{3103, 3261, 0}});
+        m.put("Al Kharid", new int[][]{{3299, 3194, 0}});
+        m.put("Varrock", new int[][]{{3236, 3417, 0}});
+        m.put("Barbarian", new int[][]{{2543, 3553, 0}});
+        m.put("Canifis", new int[][]{{3510, 3485, 0}});
+        m.put("Falador", new int[][]{{3029, 3332, 0}, {3029, 3333, 0}, {3029, 3334, 0}, {3029, 3335, 0}});
+        m.put("Seers' Village", new int[][]{{2704, 3464, 0}});
+        m.put("Pollnivneach", new int[][]{{3363, 2998, 0}});
+        m.put("Rellekka", new int[][]{{2653, 3676, 0}});
+        m.put("Ardougne", new int[][]{{2668, 3297, 0}});
+        m.put("Pyramid", new int[][]{{3364, 2830, 0}});
+        m.put("Wilderness", new int[][]{{2993, 3933, 0}, {2994, 3933, 0}, {2995, 3933, 0}});
+        m.put("Werewolf", new int[][]{{3528, 9873, 0}});
+        m.put("Prifddinas", new int[][]{{3240, 6109, 0}});
+        m.put("Shayzien Basic", new int[][]{{1554, 3640, 0}});
+        m.put("Shayzien Advanced", new int[][]{{1522, 3625, 0}});
+        m.put("Ape Atoll", new int[][]{{2770, 2747, 0}});
+        COURSE_ENDPOINTS = java.util.Collections.unmodifiableMap(m);
+    }
 
     @Inject private Client client;
     @Inject private MazeBingoConfig config;
@@ -214,6 +239,31 @@ public class MazeBingoPlugin extends Plugin {
         for (ActiveTile tile : matches) {
             submitProgress(tile, gained, skillName);
         }
+
+        if (event.getSkill() == Skill.AGILITY) {
+            checkAgilityLap();
+        }
+    }
+
+    private void checkAgilityLap() {
+        if (client.getLocalPlayer() == null) return;
+        WorldPoint loc = client.getLocalPlayer().getWorldLocation();
+        for (Map.Entry<String, int[][]> entry : COURSE_ENDPOINTS.entrySet()) {
+            for (int[] ep : entry.getValue()) {
+                if (loc.getX() == ep[0] && loc.getY() == ep[1] && loc.getPlane() == ep[2]) {
+                    String courseName = entry.getKey();
+                    log.info("Agility lap detected: course='{}'", courseName);
+                    List<ActiveTile> matches = matchingTiles("agility_lap", cfg -> {
+                        if (!cfg.has("course")) return true;
+                        return courseName.toLowerCase().contains(cfg.get("course").getAsString().toLowerCase());
+                    });
+                    for (ActiveTile tile : matches) {
+                        submitProgress(tile, 1, courseName);
+                    }
+                    return;
+                }
+            }
+        }
     }
 
     // --- NPC kills ---
@@ -290,21 +340,6 @@ public class MazeBingoPlugin extends Plugin {
         if (type != ChatMessageType.SPAM && type != ChatMessageType.GAMEMESSAGE) return;
 
         String msg = event.getMessage().replaceAll("<[^>]*>", "");
-
-        // "Your Draynor Village Rooftop lap count is: 2."
-        if (type == ChatMessageType.SPAM && msg.contains("Rooftop lap count is:")) {
-            String withoutYour = msg.startsWith("Your ") ? msg.substring("Your ".length()) : msg;
-            int rooftopIdx = withoutYour.indexOf(" Rooftop lap count is:");
-            final String course = rooftopIdx > 0 ? withoutYour.substring(0, rooftopIdx) : "";
-            log.info("Agility lap detected: course='{}'", course);
-            List<ActiveTile> matches = matchingTiles("agility_lap", cfg -> {
-                if (!cfg.has("course")) return true;
-                return course.toLowerCase().contains(cfg.get("course").getAsString().toLowerCase());
-            });
-            for (ActiveTile tile : matches) {
-                submitProgress(tile, 1, course);
-            }
-        }
 
         List<ActiveTile> minigameMatches = matchingTiles("minigame_completion", cfg -> {
             if (!cfg.has("message")) return false;

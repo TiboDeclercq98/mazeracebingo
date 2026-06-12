@@ -167,6 +167,8 @@ class TileInfoPanel extends JPanel {
                 String minigameLabel = cfg.has("minigame") ? cfg.get("minigame").getAsString()
                     : cfg.has("message") ? cfg.get("message").getAsString() : "minigame";
                 taskLine = String.format("Complete %s — %d / %d", minigameLabel, data.currentProgress, data.target);
+            } else if ("gp_value".equals(data.taskType)) {
+                taskLine = String.format("Collect %,d gp — %,d / %,d gp", data.target, data.currentProgress, data.target);
             } else {
                 taskLine = "Progress: " + data.currentProgress + " / " + data.target;
             }
@@ -179,6 +181,8 @@ class TileInfoPanel extends JPanel {
         progressBar.setValue(pct);
         progressBar.setString("xp_gain".equals(data.taskType)
             ? String.format("%,d / %,d xp", data.currentProgress, data.target)
+            : "gp_value".equals(data.taskType)
+            ? String.format("%,d / %,d gp", data.currentProgress, data.target)
             : data.currentProgress + " / " + data.target);
 
         contribPanel.removeAll();

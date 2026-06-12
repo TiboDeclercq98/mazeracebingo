@@ -38,6 +38,7 @@ import com.google.inject.Provides;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -380,6 +381,7 @@ public class MazeBingoPlugin extends Plugin {
                 submitProgress(tile, stack.getQuantity(), itemName);
             }
         }
+        submitGpValue(event.getItems());
     }
 
     @Subscribe
@@ -398,6 +400,20 @@ public class MazeBingoPlugin extends Plugin {
             for (ActiveTile tile : matches) {
                 submitProgress(tile, stack.getQuantity(), itemName);
             }
+        }
+        submitGpValue(event.getItems());
+    }
+
+    private void submitGpValue(Collection<ItemStack> items) {
+        List<ActiveTile> gpTiles = matchingTiles("gp_value", cfg -> true);
+        if (gpTiles.isEmpty()) return;
+        int totalGp = 0;
+        for (ItemStack stack : items) {
+            totalGp += itemManager.getItemPrice(stack.getId()) * stack.getQuantity();
+        }
+        if (totalGp <= 0) return;
+        for (ActiveTile tile : gpTiles) {
+            submitProgress(tile, totalGp, "gp");
         }
     }
 

@@ -82,6 +82,7 @@ public class MazeBingoPlugin extends Plugin {
         m.put("Prifddinas", new int[][]{{3240, 6109, 0}});
         m.put("Shayzien Basic", new int[][]{{1554, 3640, 0}});
         m.put("Shayzien Advanced", new int[][]{{1522, 3625, 0}});
+        m.put("Penguin", new int[][]{{2652, 4039, 1}});
         m.put("Ape Atoll", new int[][]{{2770, 2747, 0}});
         COURSE_ENDPOINTS = java.util.Collections.unmodifiableMap(m);
     }

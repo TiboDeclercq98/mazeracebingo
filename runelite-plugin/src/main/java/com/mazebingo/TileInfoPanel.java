@@ -174,6 +174,18 @@ class TileInfoPanel extends JPanel {
                 contribPanel.add(buildItemProgressRow(ip));
                 contribPanel.add(Box.createRigidArea(new Dimension(0, 3)));
             }
+            if (data.contributions != null && !data.contributions.isEmpty()) {
+                contribPanel.add(Box.createRigidArea(new Dimension(0, 2)));
+                for (TileProgressResponse.Contribution c : data.contributions) {
+                    String text = (c.subCategory != null && !c.subCategory.isEmpty())
+                        ? c.playerName + ": " + c.amount + " " + c.subCategory
+                        : c.playerName + ": " + c.amount;
+                    JLabel l = new JLabel(text);
+                    l.setForeground(new Color(140, 140, 140));
+                    l.setFont(FontManager.getRunescapeSmallFont());
+                    contribPanel.add(l);
+                }
+            }
         } else if (data.contributions == null || data.contributions.isEmpty()) {
             JLabel none = new JLabel("No contributions yet");
             none.setForeground(Color.GRAY);

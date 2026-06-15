@@ -235,6 +235,47 @@ async function loadMazeFromDb(team) {
   const taskDefs = await dbQuery('SELECT * FROM taskDefinitions WHERE team = $1', [team]);
   taskDefinitions = {};
   taskDefs.forEach(d => { taskDefinitions[d.tileid] = { taskType: d.tasktype, taskConfig: d.taskconfig }; });
+
+  // For "each" mode tiles, recompute completionsDone and completionsRequired from the
+  // actual tile_progress records so the values are always correct — even before the
+  // first submission (when the stored completionsRequired is just the raw per-item target).
+  const eachTileIds = mazeState
+    .filter(t => !t.completed)
+    .map(t => t.id)
+    .filter(id => {
+      const def = taskDefinitions[id];
+      return def && def.taskConfig && def.taskConfig.mode === 'each';
+    });
+
+  if (eachTileIds.length > 0) {
+    const placeholders = eachTileIds.map((_, i) => `$${i + 2}`).join(', ');
+    const progressRows = await dbQuery(
+      `SELECT tileid, subcategory, SUM(amount) AS total FROM tile_progress
+       WHERE team = $1 AND tileid IN (${placeholders}) AND subcategory IS NOT NULL
+       GROUP BY tileid, subcategory`,
+      [team, ...eachTileIds]
+    );
+    const progressByTile = {};
+    progressRows.forEach(r => {
+      if (!progressByTile[r.tileid]) progressByTile[r.tileid] = {};
+      progressByTile[r.tileid][r.subcategory.toLowerCase()] = parseInt(r.total);
+    });
+
+    for (const id of eachTileIds) {
+      const def = taskDefinitions[id];
+      const items = getEachModeItems(def.taskType, def.taskConfig);
+      const perItemTarget = def.taskConfig.target || 1;
+      const totals = progressByTile[id] || {};
+      let done = 0;
+      for (const name of items) {
+        done += Math.min(totals[name.toLowerCase()] || 0, perItemTarget);
+      }
+      const tile = mazeState.find(t => t.id === id);
+      tile.completionsDone = done;
+      tile.completionsRequired = items.length * perItemTarget;
+    }
+  }
+
   return { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions };
 }
 

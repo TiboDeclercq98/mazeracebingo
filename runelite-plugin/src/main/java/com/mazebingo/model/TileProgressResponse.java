@@ -16,4 +16,12 @@ public class TileProgressResponse {
         public String subCategory;
         public int amount;
     }
+
+    public static class ItemProgress {
+        public String name;
+        public int progress;
+        public int target;
+    }
+
+    public List<ItemProgress> itemProgress;
 }

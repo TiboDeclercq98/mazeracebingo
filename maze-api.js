@@ -301,6 +301,15 @@ async function saveTaskDefinitions(team, taskDefinitions) {
 
 // --- CORE GAME LOGIC ---
 
+// Returns the ordered list of named entries for a task that uses "mode": "each".
+function getEachModeItems(taskType, taskConfig) {
+  if (taskType === 'npc_kill')    return taskConfig.npcs    || (taskConfig.npc    ? [taskConfig.npc]    : []);
+  if (taskType === 'xp_gain')     return taskConfig.skills  || (taskConfig.skill  ? [taskConfig.skill]  : []);
+  if (taskType === 'item_drop')   return taskConfig.items   || (taskConfig.item   ? [taskConfig.item]   : []);
+  if (taskType === 'agility_lap') return taskConfig.courses || (taskConfig.course ? [taskConfig.course] : []);
+  return [];
+}
+
 // Validates tile access, records a progress contribution, updates tile state, and fires special events.
 // Returns { success, tile, specialEvent, progress, target, completed } on success,
 // or { error, status } / { success: false, alreadyCompleted, tile, status } on failure.
@@ -340,11 +349,41 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
     [id, team, playerName, amount, subCategory || null]
   );
 
-  tile.completionsDone = (tile.completionsDone || 0) + amount;
-
   let specialEvent = null;
+  const taskDef = taskDefinitions[id];
+  const taskCfg = taskDef ? taskDef.taskConfig : null;
+  const taskTyp = taskDef ? taskDef.taskType : null;
+  const isEachMode = !!(taskCfg && taskCfg.mode === 'each');
 
-  if (tile.completionsDone >= (tile.completionsRequired || 1)) {
+  // For "each" mode: every listed entry must independently reach the per-item target.
+  // completionsDone = sum of min(actual, perItemTarget) across all entries (used for the progress display).
+  // completionsRequired = entries.length * perItemTarget (the combined total shown in the Active Tasks panel).
+  let tileComplete = false;
+  if (isEachMode) {
+    const items = getEachModeItems(taskTyp, taskCfg);
+    const perItemTarget = taskCfg.target || 1;
+    const perItemRows = await dbQuery(
+      'SELECT subcategory, SUM(amount) AS total FROM tile_progress WHERE tileid = $1 AND team = $2 AND subcategory IS NOT NULL GROUP BY subcategory',
+      [id, team]
+    );
+    const totals = {};
+    perItemRows.forEach(r => { totals[r.subcategory.toLowerCase()] = parseInt(r.total); });
+    let done = 0;
+    let allMet = true;
+    for (const name of items) {
+      const actual = totals[name.toLowerCase()] || 0;
+      done += Math.min(actual, perItemTarget);
+      if (actual < perItemTarget) allMet = false;
+    }
+    tile.completionsDone = done;
+    tile.completionsRequired = items.length * perItemTarget;
+    tileComplete = allMet;
+  } else {
+    tile.completionsDone = (tile.completionsDone || 0) + amount;
+    tileComplete = tile.completionsDone >= (tile.completionsRequired || 1);
+  }
+
+  if (tileComplete) {
     tile.completed = true;
 
     if (isEnd) {
@@ -487,13 +526,31 @@ app.get('/api/tiles/progress/:id', async (req, res, next) => {
        GROUP BY playername, subcategory ORDER BY total DESC`,
       [id, team]
     );
+    let itemProgress = null;
+    if (taskDef && taskDef.taskconfig && taskDef.taskconfig.mode === 'each') {
+      const taskCfg = taskDef.taskconfig;
+      const items = getEachModeItems(taskDef.tasktype, taskCfg);
+      const perItemTarget = taskCfg.target || 1;
+      const perItemRows = await dbQuery(
+        'SELECT subcategory, SUM(amount) AS total FROM tile_progress WHERE tileid = $1 AND team = $2 AND subcategory IS NOT NULL GROUP BY subcategory',
+        [id, team]
+      );
+      const totals = {};
+      perItemRows.forEach(r => { totals[r.subcategory.toLowerCase()] = parseInt(r.total); });
+      itemProgress = items.map(name => ({
+        name,
+        progress: Math.min(totals[name.toLowerCase()] || 0, perItemTarget),
+        target: perItemTarget
+      }));
+    }
     res.json({
       tileId: id,
       taskType:        taskDef ? taskDef.tasktype   : null,
       taskConfig:      taskDef ? taskDef.taskconfig : null,
       currentProgress: tile.completionsDone || 0,
       target:          tile.completionsRequired || 1,
-      contributions:   rows.map(r => ({ playerName: r.playername, subCategory: r.subcategory || null, amount: r.total, lastSubmitted: r.lastsubmitted }))
+      contributions:   rows.map(r => ({ playerName: r.playername, subCategory: r.subcategory || null, amount: r.total, lastSubmitted: r.lastsubmitted })),
+      itemProgress
     });
   } catch (err) { next(err); }
 });

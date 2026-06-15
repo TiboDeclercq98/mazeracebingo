@@ -116,53 +116,36 @@ class TileInfoPanel extends JPanel {
         titleLabel.setText("<html>Tile " + data.tileId + (description.isEmpty() ? "" : ": " + description) + "</html>");
         titleLabel.setForeground(isBoobytrap ? Color.RED : Color.WHITE);
 
+        boolean eachMode = data.taskConfig != null && data.taskConfig.isJsonObject()
+            && data.taskConfig.getAsJsonObject().has("mode")
+            && "each".equals(data.taskConfig.getAsJsonObject().get("mode").getAsString());
+
         String taskLine;
         if (data.taskConfig != null && data.taskConfig.isJsonObject()) {
             JsonObject cfg = data.taskConfig.getAsJsonObject();
             if ("npc_kill".equals(data.taskType)) {
-                String npcLabel;
-                if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
-                    java.util.List<String> names = new java.util.ArrayList<>();
-                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) names.add(el.getAsString());
-                    if (names.size() > 1) npcLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
-                    else npcLabel = names.get(0);
-                } else {
-                    npcLabel = cfg.has("npc") ? cfg.get("npc").getAsString() : "?";
-                }
-                taskLine = String.format("Kill %s — %d / %d kills", npcLabel, data.currentProgress, data.target);
+                String npcLabel = buildListLabel(cfg, "npcs", "npc", eachMode);
+                taskLine = eachMode
+                    ? String.format("Kill each: %s — %d / %d kills", npcLabel, data.currentProgress, data.target)
+                    : String.format("Kill %s — %d / %d kills", npcLabel, data.currentProgress, data.target);
             } else if ("xp_gain".equals(data.taskType)) {
-                String skillLabel;
-                if (cfg.has("skills") && cfg.get("skills").isJsonArray()) {
-                    java.util.List<String> names = new java.util.ArrayList<>();
-                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("skills")) names.add(el.getAsString());
-                    if (names.size() > 1) skillLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
-                    else skillLabel = names.get(0);
+                String skillLabel = buildListLabel(cfg, "skills", "skill", eachMode);
+                if (eachMode) {
+                    int perItemTarget = cfg.has("target") ? cfg.get("target").getAsInt() : data.target;
+                    taskLine = String.format("Gain %,d XP each: %s — %,d / %,d", perItemTarget, skillLabel, data.currentProgress, data.target);
                 } else {
-                    skillLabel = cfg.has("skill") ? cfg.get("skill").getAsString() : "?";
+                    taskLine = String.format("Gain %,d %s XP — %,d / %,d", data.target, skillLabel, data.currentProgress, data.target);
                 }
-                taskLine = String.format("Gain %,d %s XP — %,d / %,d", data.target, skillLabel, data.currentProgress, data.target);
             } else if ("item_drop".equals(data.taskType) || "loot_item".equals(data.taskType)) {
-                String itemLabel;
-                if (cfg.has("items") && cfg.get("items").isJsonArray()) {
-                    java.util.List<String> names = new java.util.ArrayList<>();
-                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("items")) names.add(el.getAsString());
-                    if (names.size() > 1) itemLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
-                    else itemLabel = names.get(0);
-                } else {
-                    itemLabel = cfg.has("item") ? cfg.get("item").getAsString() : "?";
-                }
-                taskLine = "Receive " + itemLabel + " — " + data.currentProgress + " / " + data.target;
+                String itemLabel = buildListLabel(cfg, "items", "item", eachMode);
+                taskLine = eachMode
+                    ? String.format("Receive each: %s — %d / %d", itemLabel, data.currentProgress, data.target)
+                    : "Receive " + itemLabel + " — " + data.currentProgress + " / " + data.target;
             } else if ("agility_lap".equals(data.taskType)) {
-                String courseLabel;
-                if (cfg.has("courses") && cfg.get("courses").isJsonArray()) {
-                    java.util.List<String> names = new java.util.ArrayList<>();
-                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("courses")) names.add(el.getAsString());
-                    if (names.size() > 1) courseLabel = String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
-                    else courseLabel = names.get(0);
-                } else {
-                    courseLabel = cfg.has("course") ? cfg.get("course").getAsString() : "any course";
-                }
-                taskLine = String.format("Complete laps of %s — %d / %d laps", courseLabel, data.currentProgress, data.target);
+                String courseLabel = buildListLabel(cfg, "courses", "course", eachMode);
+                taskLine = eachMode
+                    ? String.format("Complete laps of each: %s — %d / %d laps", courseLabel, data.currentProgress, data.target)
+                    : String.format("Complete laps of %s — %d / %d laps", courseLabel, data.currentProgress, data.target);
             } else if ("minigame_completion".equals(data.taskType)) {
                 String minigameLabel = cfg.has("minigame") ? cfg.get("minigame").getAsString()
                     : cfg.has("message") ? cfg.get("message").getAsString() : "minigame";
@@ -186,7 +169,12 @@ class TileInfoPanel extends JPanel {
             : data.currentProgress + " / " + data.target);
 
         contribPanel.removeAll();
-        if (data.contributions == null || data.contributions.isEmpty()) {
+        if (eachMode && data.itemProgress != null && !data.itemProgress.isEmpty()) {
+            for (TileProgressResponse.ItemProgress ip : data.itemProgress) {
+                contribPanel.add(buildItemProgressRow(ip));
+                contribPanel.add(Box.createRigidArea(new Dimension(0, 3)));
+            }
+        } else if (data.contributions == null || data.contributions.isEmpty()) {
             JLabel none = new JLabel("No contributions yet");
             none.setForeground(Color.GRAY);
             none.setFont(FontManager.getRunescapeSmallFont());
@@ -206,6 +194,48 @@ class TileInfoPanel extends JPanel {
         setVisible(true);
         revalidate();
         repaint();
+    }
+
+    // Joins a list field from taskConfig. In each mode, all names are comma-separated.
+    // In shared mode, the last item is joined with "or".
+    private static String buildListLabel(JsonObject cfg, String pluralKey, String singularKey, boolean eachMode) {
+        if (cfg.has(pluralKey) && cfg.get(pluralKey).isJsonArray()) {
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (com.google.gson.JsonElement el : cfg.getAsJsonArray(pluralKey)) names.add(el.getAsString());
+            if (!eachMode && names.size() > 1) {
+                return String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.get(names.size() - 1);
+            }
+            return String.join(", ", names);
+        }
+        return cfg.has(singularKey) ? cfg.get(singularKey).getAsString() : "?";
+    }
+
+    // Builds a compact name + progress-bar row for a single entry in an "each" mode tile.
+    private JPanel buildItemProgressRow(TileProgressResponse.ItemProgress ip) {
+        JPanel row = new JPanel(new BorderLayout(0, 1));
+        row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+
+        JLabel nameLabel = new JLabel(ip.name);
+        nameLabel.setForeground(new Color(200, 200, 200));
+        nameLabel.setFont(FontManager.getRunescapeSmallFont());
+
+        JProgressBar bar = new JProgressBar(0, ip.target);
+        bar.setValue(ip.progress);
+        bar.setStringPainted(true);
+        bar.setString(ip.progress + " / " + ip.target);
+        bar.setForeground(ip.progress >= ip.target ? new Color(76, 175, 80) : new Color(100, 149, 237));
+        bar.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
+        bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 14));
+        bar.setUI(new BasicProgressBarUI() {
+            @Override protected Color getSelectionForeground() { return Color.WHITE; }
+            @Override protected Color getSelectionBackground() { return Color.WHITE; }
+        });
+
+        row.add(nameLabel, BorderLayout.NORTH);
+        row.add(bar, BorderLayout.SOUTH);
+        return row;
     }
 
     void clear() {

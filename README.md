@@ -104,7 +104,10 @@ In the RuneLite settings panel (search "Maze"):
 |---|---|
 | `npc_kill` | Kills on a specific NPC the player attacked |
 | `xp_gain` | XP gained in a specific skill (delta since tracking started) |
-| `item_drop` | Items received from NPC loot (`NpcLootReceived` event) |
+| `item_drop` | Items received from NPC loot (`NpcLootReceived` / `LootReceived` events) |
+| `agility_lap` | Agility laps detected by player position at course finish tiles |
+| `minigame_completion` | Completions detected by a configurable chat message substring |
+| `gp_value` | Total GP value of all items received from NPC loot |
 
 The plugin displays a maze map panel and a tile info panel in the RuneLite sidebar showing current task progress.
 
@@ -207,10 +210,16 @@ Save files are JSON uploaded via `/createmaze` or the web UI Load button.
     "5": "Kill Vorkath"
   },
   "taskDefinitions": [
-    { "tileId": 5,  "taskType": "npc_kill",  "taskConfig": { "npc": "Vorkath",        "target": 50     } },
-    { "tileId": 12, "taskType": "xp_gain",   "taskConfig": { "skill": "Slayer",        "target": 100000 } },
-    { "tileId": 20, "taskType": "item_drop", "taskConfig": { "item": "Tanzanite fang", "target": 1      } },
-    { "tileId": 30, "taskType": "item_drop", "taskConfig": { "items": ["Tanzanite fang", "Uncut onyx"], "target": 1 } }
+    { "tileId": 5,  "taskType": "npc_kill",            "taskConfig": { "npc": "Vorkath",                             "target": 50     } },
+    { "tileId": 6,  "taskType": "npc_kill",            "taskConfig": { "npcs": ["Zulrah", "Vorkath"],                "target": 100    } },
+    { "tileId": 12, "taskType": "xp_gain",             "taskConfig": { "skill": "Slayer",                            "target": 100000 } },
+    { "tileId": 13, "taskType": "xp_gain",             "taskConfig": { "skills": ["Attack", "Strength", "Defence"],  "target": 50000  } },
+    { "tileId": 20, "taskType": "item_drop",           "taskConfig": { "item": "Tanzanite fang",                     "target": 1      } },
+    { "tileId": 21, "taskType": "item_drop",           "taskConfig": { "items": ["Tanzanite fang", "Uncut onyx"],    "target": 1      } },
+    { "tileId": 30, "taskType": "agility_lap",         "taskConfig": { "course": "Ardougne",                         "target": 100    } },
+    { "tileId": 31, "taskType": "agility_lap",         "taskConfig": { "courses": ["Gnome", "Draynor"],              "target": 200    } },
+    { "tileId": 40, "taskType": "minigame_completion", "taskConfig": { "minigame": "Barrows", "message": "your completed barrows run", "target": 25 } },
+    { "tileId": 50, "taskType": "gp_value",            "taskConfig": { "target": 10000000 } }
   ]
 }
 ```
@@ -221,9 +230,12 @@ Save files are JSON uploaded via `/createmaze` or the web UI Load button.
 
 | Task Type | Config fields | Description |
 |---|---|---|
-| `npc_kill` | `npc` (string), `target` (int) | Kill a specific NPC N times |
-| `xp_gain` | `skill` (string), `target` (int) | Gain N XP in a specific skill |
+| `npc_kill` | `npc` (string) OR `npcs` (array), `target` (int) | Kill a specific NPC N times |
+| `xp_gain` | `skill` (string) OR `skills` (array), `target` (int) | Gain N XP in a specific skill |
 | `item_drop` | `item` (string) OR `items` (array), `target` (int) | Receive an item from NPC loot N times |
+| `agility_lap` | `course` (string) OR `courses` (array), `target` (int) | Complete N laps of an agility course |
+| `minigame_completion` | `minigame` (string), `message` (string), `target` (int) | Complete a minigame N times — detected when `message` appears in chat |
+| `gp_value` | `target` (int) | Collect N GP worth of NPC loot |
 
 ---
 

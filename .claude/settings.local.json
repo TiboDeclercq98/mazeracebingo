@@ -98,7 +98,8 @@
       "Bash(\"/c/Users/Tibo Declercq/.jdks/corretto-11.0.31/bin/javap.exe\" -private -v -cp \"/tmp/itemstack_class\" \"net.runelite.client.game.ItemStack\")",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\" -Recurse -File -Filter \"*.json\" -Exclude \"*node_modules*\")",
       "PowerShell(Head -20)",
-      "Bash(xargs grep -l \"taskType\\\\|npc_kill\\\\|xp_gain\\\\|item_drop\")"
+      "Bash(xargs grep -l \"taskType\\\\|npc_kill\\\\|xp_gain\\\\|item_drop\")",
+      "WebFetch(domain:oldschool.runescape.wiki)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

@@ -25,9 +25,13 @@ public class MazeEventNotificationOverlay {
     private static final int RESIZABLE_MODERN_LAYOUT  = (164 << 16) | 13;
     private static final int FIXED_CLASSIC_LAYOUT     = 35913770;
 
+    private static final float MIN_GAIN_DB = -80f;
+    private static final float MAX_GAIN_DB = 0f;
+
     @Inject private Client client;
     @Inject private ClientThread clientThread;
     @Inject private AudioPlayer audioPlayer;
+    @Inject private MazeBingoConfig config;
 
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
@@ -51,17 +55,19 @@ public class MazeEventNotificationOverlay {
                 popupWidgetNode = client.openInterface(componentId, 660, WidgetModalMode.MODAL_CLICKTHROUGH);
                 client.runScript(3343, "Maze Race Bingo", message, -1);
 
-                String lowerMsg = message.toLowerCase();
-                MazeSound sound = lowerMsg.contains("completed the end tile") ? MazeSound.BOBER
-                    : lowerMsg.contains("has found a key") ? MazeSound.WHIP
-                    : lowerMsg.contains("keys") ? MazeSound.SAD_SOUND:
-                    MazeSound.SHORT_DOG_BARK;
-                InputStream stream = SoundGenerator.generate(sound);
-                if (stream != null) {
-                    try {
-                        audioPlayer.play(stream, 0f);
-                    } catch (Exception ex) {
-                        log.warn("Failed to play notification sound", ex);
+                if (config.soundsEnabled() && config.soundVolume() > 0) {
+                    String lowerMsg = message.toLowerCase();
+                    MazeSound sound = lowerMsg.contains("completed the end tile") ? MazeSound.SUCCESS
+                        : lowerMsg.contains("has found a key") ? MazeSound.SPECIAL
+                        : lowerMsg.contains("keys") ? MazeSound.FAIL:
+                        MazeSound.COMPLETION;
+                    InputStream stream = SoundGenerator.generate(sound, config.customSoundsFolder());
+                    if (stream != null) {
+                        try {
+                            audioPlayer.play(stream, volumeToGainDb(config.soundVolume()));
+                        } catch (Exception ex) {
+                            log.warn("Failed to play notification sound", ex);
+                        }
                     }
                 }
 
@@ -94,5 +100,10 @@ public class MazeEventNotificationOverlay {
             });
         }
         return true;
+    }
+
+    private static float volumeToGainDb(int volumePercent) {
+        float gainDb = (float) (20 * Math.log10(volumePercent / 100.0));
+        return Math.max(MIN_GAIN_DB, Math.min(MAX_GAIN_DB, gainDb));
     }
 }

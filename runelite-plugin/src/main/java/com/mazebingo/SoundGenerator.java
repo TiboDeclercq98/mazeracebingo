@@ -8,19 +8,51 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 class SoundGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(SoundGenerator.class);
     private static final int SAMPLE_RATE = 44100;
 
-    static InputStream generate(MazeSound sound) {
+    static InputStream generate(MazeSound sound, String customFolder) {
+        String filename = filenameFor(sound);
+        if (filename == null) {
+            return null;
+        }
+
+        if (customFolder != null && !customFolder.isBlank()) {
+            InputStream custom = loadCustomWav(customFolder, filename);
+            if (custom != null) {
+                return custom;
+            }
+        }
+
+        return loadWav("/com/mazebingo/sounds/" + filename);
+    }
+
+    private static String filenameFor(MazeSound sound) {
         switch (sound) {
-            case SHORT_DOG_BARK: return loadWav("/com/mazebingo/sounds/short-dog-bark.wav");
-            case WHIP:            return loadWav("/com/mazebingo/sounds/whip.wav");
-            case BOBER:           return loadWav("/com/mazebingo/sounds/bober_kurwa.wav");
-            case SAD_SOUND:     return loadWav("/com/mazebingo/sounds/sad_sound.wav");
-            default:             return null;
+            case COMPLETION: return "completion.wav";
+            case SPECIAL:     return "special.wav";
+            case SUCCESS:     return "success.wav";
+            case FAIL:        return "fail.wav";
+            default:          return null;
+        }
+    }
+
+    private static InputStream loadCustomWav(String customFolder, String filename) {
+        Path path = Paths.get(customFolder, filename);
+        if (!Files.isReadable(path)) {
+            return null;
+        }
+        try {
+            return new ByteArrayInputStream(Files.readAllBytes(path));
+        } catch (IOException e) {
+            log.warn("Failed to read custom sound file {}", path, e);
+            return null;
         }
     }
 

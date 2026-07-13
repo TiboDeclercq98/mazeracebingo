@@ -605,9 +605,8 @@ public class MazeBingoPlugin extends Plugin {
                             : "gameover".equals(e.type) ? new Color(76, 175, 80)
                             : new Color(255, 204, 0);
                         panel.addEvent(e.message, color);
-                        if (!"tile_complete".equals(e.type) || config.tileCompletionPopupEnabled()) {
-                            notifOverlay.addNotification(e.message, color);
-                        }
+                        boolean showPopup = !"tile_complete".equals(e.type) || config.tileCompletionPopupEnabled();
+                        notifOverlay.addNotification(e.message, color, showPopup);
                         lastSeenEventId = e.id;
                     }
                 }

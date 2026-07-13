@@ -38,7 +38,11 @@ public class MazeEventNotificationOverlay {
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
 
-    public synchronized void addNotification(String message, Color ignored) {
+    public synchronized void addNotification(String message, Color ignored, boolean showPopup) {
+        playSound(message);
+        if (!showPopup) {
+            return;
+        }
         queue.add(message);
         if (queue.size() == 1) {
             showPopup(message);
@@ -56,8 +60,6 @@ public class MazeEventNotificationOverlay {
 
                 popupWidgetNode = client.openInterface(componentId, 660, WidgetModalMode.MODAL_CLICKTHROUGH);
                 client.runScript(3343, "Maze Race Bingo", message, -1);
-
-                playSound(message);
 
                 clientThread.invokeLater(this::tryClearMessage);
             } catch (IllegalStateException ex) {

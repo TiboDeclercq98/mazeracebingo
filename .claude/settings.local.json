@@ -113,7 +113,10 @@
       "Bash(curl -s https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/plugins/idlenotifier/IdleNotifierPlugin.java)",
       "Bash(curl -s https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/Notifier.java -o \"C:\\\\Users\\\\Tibo Declercq\\\\.claude\\\\projects\\\\c--Users-Tibo-Declercq-Documents-Maze-Bingo\\\\37c0a49b-81de-48ca-845e-95fec33a1486\\\\tool-results\\\\notifier.txt\")",
       "Bash(curl -s https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/RuneLite.java)",
-      "Bash(curl -s https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/plugins/screenshot/ScreenshotPlugin.java)"
+      "Bash(curl -s https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/plugins/screenshot/ScreenshotPlugin.java)",
+      "Bash(grep -i -E \"\\\\.java$\")",
+      "Bash(xargs -I{} echo {})",
+      "Bash(./gradlew compileJava -q)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

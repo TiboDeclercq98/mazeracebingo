@@ -58,4 +58,128 @@ public interface MazeBingoConfig extends Config {
     default int soundVolume() {
         return 100;
     }
+
+    @ConfigSection(
+        name = "Pop-up",
+        description = "Modal pop-up notification settings",
+        position = 5
+    )
+    String popup = "popup";
+
+    @ConfigItem(
+        keyName = "tileCompletionPopupEnabled",
+        name = "Tile completion pop-up",
+        description = "Show the modal pop-up notification when a tile is completed. Only affects what you see.",
+        section = "popup",
+        position = 6
+    )
+    default boolean tileCompletionPopupEnabled() {
+        return true;
+    }
+
+    @ConfigSection(
+        name = "Chat Messages",
+        description = "Which progress messages are sent to your chatbox. Only affects your own chat.",
+        position = 7
+    )
+    String chatMessages = "chatMessages";
+
+    @ConfigItem(
+        keyName = "chatContributionXp",
+        name = "XP gain contributions",
+        description = "Show \"You contributed...\" chat messages for XP gain tiles",
+        section = "chatMessages",
+        position = 8
+    )
+    default boolean chatContributionXp() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatContributionNpcKill",
+        name = "NPC kill contributions",
+        description = "Show \"You contributed...\" chat messages for NPC kill tiles",
+        section = "chatMessages",
+        position = 9
+    )
+    default boolean chatContributionNpcKill() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatContributionAgilityLap",
+        name = "Agility lap contributions",
+        description = "Show \"You contributed...\" chat messages for agility lap tiles",
+        section = "chatMessages",
+        position = 10
+    )
+    default boolean chatContributionAgilityLap() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatContributionMinigame",
+        name = "Minigame completion contributions",
+        description = "Show \"You contributed...\" chat messages for minigame completion tiles",
+        section = "chatMessages",
+        position = 11
+    )
+    default boolean chatContributionMinigame() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatContributionItemDrop",
+        name = "Item drop contributions",
+        description = "Show \"You contributed...\" chat messages for item drop tiles",
+        section = "chatMessages",
+        position = 12
+    )
+    default boolean chatContributionItemDrop() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatContributionGpValue",
+        name = "GP value contributions",
+        description = "Show \"You contributed...\" chat messages for GP value tiles",
+        section = "chatMessages",
+        position = 13
+    )
+    default boolean chatContributionGpValue() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatErrorMessages",
+        name = "Error messages",
+        description = "Show error messages in chat when a progress submission fails",
+        section = "chatMessages",
+        position = 14
+    )
+    default boolean chatErrorMessages() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatCompletionMessages",
+        name = "Tile completion messages",
+        description = "Show a chat message when you complete a tile",
+        section = "chatMessages",
+        position = 15
+    )
+    default boolean chatCompletionMessages() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatSpecialEventMessages",
+        name = "Special event messages",
+        description = "Show special event chat messages (e.g. game over, bonus events)",
+        section = "chatMessages",
+        position = 16
+    )
+    default boolean chatSpecialEventMessages() {
+        return true;
+    }
 }

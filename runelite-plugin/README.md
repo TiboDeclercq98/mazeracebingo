@@ -82,10 +82,12 @@ After each submission you receive a chat message: *"You contributed X [item/xp] 
 Sound cues play when events arrive:
 | Trigger | Sound |
 |---------|-------|
-| End tile completed | Bober |
-| Key found | Whip |
-| Keys missing | Sad tone |
-| Other events | Short dog bark |
+| End tile completed | Success |
+| Key found | Special |
+| Keys missing | Fail |
+| Other events | Completion |
+
+Sounds can be muted or have their volume adjusted in the plugin config panel. To replace a sound with your own, drop a `.wav` file named `success.wav`, `special.wav`, `fail.wav`, or `completion.wav` into `.runelite/mazebingo/sounds/` (created automatically on first plugin startup) — it overrides the bundled sound for that event.
 
 ## Setup
 

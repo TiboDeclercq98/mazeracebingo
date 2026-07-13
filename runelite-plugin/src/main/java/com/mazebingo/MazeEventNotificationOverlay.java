@@ -12,9 +12,10 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.awt.Color;
-import java.io.InputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 
 @Singleton
 public class MazeEventNotificationOverlay {
@@ -32,6 +33,7 @@ public class MazeEventNotificationOverlay {
     @Inject private ClientThread clientThread;
     @Inject private AudioPlayer audioPlayer;
     @Inject private MazeBingoConfig config;
+    @Inject private ScheduledExecutorService executorService;
 
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
@@ -55,25 +57,41 @@ public class MazeEventNotificationOverlay {
                 popupWidgetNode = client.openInterface(componentId, 660, WidgetModalMode.MODAL_CLICKTHROUGH);
                 client.runScript(3343, "Maze Race Bingo", message, -1);
 
-                if (config.soundsEnabled() && config.soundVolume() > 0) {
-                    String lowerMsg = message.toLowerCase();
-                    MazeSound sound = lowerMsg.contains("completed the end tile") ? MazeSound.SUCCESS
-                        : lowerMsg.contains("has found a key") ? MazeSound.SPECIAL
-                        : lowerMsg.contains("keys") ? MazeSound.FAIL:
-                        MazeSound.COMPLETION;
-                    InputStream stream = SoundGenerator.generate(sound, config.customSoundsFolder());
-                    if (stream != null) {
-                        try {
-                            audioPlayer.play(stream, volumeToGainDb(config.soundVolume()));
-                        } catch (Exception ex) {
-                            log.warn("Failed to play notification sound", ex);
-                        }
-                    }
-                }
+                playSound(message);
 
                 clientThread.invokeLater(this::tryClearMessage);
             } catch (IllegalStateException ex) {
                 clientThread.invokeLater(this::tryClearMessage);
+            }
+        });
+    }
+
+    private void playSound(String message) {
+        if (!config.soundsEnabled() || config.soundVolume() <= 0) {
+            return;
+        }
+
+        String lowerMsg = message.toLowerCase();
+        MazeSound sound = lowerMsg.contains("completed the end tile") ? MazeSound.SUCCESS
+            : lowerMsg.contains("has found a key") ? MazeSound.SPECIAL
+            : lowerMsg.contains("keys") ? MazeSound.FAIL:
+            MazeSound.COMPLETION;
+        float gainDb = volumeToGainDb(config.soundVolume());
+
+        // Playback touches disk (custom sound file lookup) so it must not run on the client thread.
+        executorService.submit(() -> {
+            try {
+                File custom = SoundGenerator.customFile(sound);
+                if (custom != null && custom.isFile()) {
+                    audioPlayer.play(custom, gainDb);
+                    return;
+                }
+                String resource = SoundGenerator.classpathResource(sound);
+                if (resource != null) {
+                    audioPlayer.play(SoundGenerator.class, resource, gainDb);
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to play notification sound", ex);
             }
         });
     }

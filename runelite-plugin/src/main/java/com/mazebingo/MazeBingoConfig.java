@@ -58,16 +58,4 @@ public interface MazeBingoConfig extends Config {
     default int soundVolume() {
         return 100;
     }
-
-    @ConfigItem(
-        keyName = "customSoundsFolder",
-        name = "Custom sounds folder",
-        description = "Absolute path to a folder containing replacement .wav files "
-            + "(completion.wav, special.wav, success.wav, fail.wav). Leave blank to use the built-in sounds.",
-        section = "sounds",
-        position = 5
-    )
-    default String customSoundsFolder() {
-        return "";
-    }
 }

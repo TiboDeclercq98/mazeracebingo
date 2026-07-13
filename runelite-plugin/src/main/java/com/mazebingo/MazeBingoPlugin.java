@@ -125,6 +125,7 @@ public class MazeBingoPlugin extends Plugin {
 
     @Override
     protected void startUp() {
+        SoundGenerator.ensureSoundsDirExists();
         executor = Executors.newSingleThreadScheduledExecutor();
         panel.setOnRefresh(() -> executor.execute(this::refreshMazeState));
         panel.setOnTileClick(tile -> {

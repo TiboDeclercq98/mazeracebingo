@@ -462,7 +462,7 @@ public class MazeBingoPlugin extends Plugin {
                 : "minigame_completion".equals(tile.taskType) ? " completion"
                 : "";
             String contrib = amount + (subCategory != null ? " " + subCategory : "") + suffix;
-            if (contributionMessageEnabled(tile.taskType)) {
+            if (response.contributed && contributionMessageEnabled(tile.taskType)) {
                 sendChatMessage("You contributed " + contrib + " to tile " + tile.id + ".");
             }
 

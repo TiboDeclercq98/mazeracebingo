@@ -384,6 +384,34 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
     }
   }
 
+  const taskDef = taskDefinitions[id];
+  const taskCfg = taskDef ? taskDef.taskConfig : null;
+  const taskTyp = taskDef ? taskDef.taskType : null;
+  const isEachMode = !!(taskCfg && taskCfg.mode === 'each');
+
+  // For "each" mode, a contribution toward an item that has already reached its
+  // per-item target doesn't move the tile forward. Skip logging it so surplus
+  // drops don't pile up in the ledger, and tell the caller nothing changed.
+  if (isEachMode && subCategory) {
+    const perItemTarget = taskCfg.target || 1;
+    const existingRows = await dbQuery(
+      'SELECT COALESCE(SUM(amount), 0) AS total FROM tile_progress WHERE tileid = $1 AND team = $2 AND LOWER(subcategory) = LOWER($3)',
+      [id, team, subCategory]
+    );
+    const actual = parseInt(existingRows[0].total);
+    if (actual >= perItemTarget) {
+      return {
+        success: true,
+        tile,
+        specialEvent: null,
+        progress: tile.completionsDone,
+        target: tile.completionsRequired,
+        completed: tile.completed,
+        contributed: false
+      };
+    }
+  }
+
   // Record the individual contribution before updating the tile.
   await dbQuery(
     'INSERT INTO tile_progress (tileId, team, playerName, amount, subCategory) VALUES ($1, $2, $3, $4, $5)',
@@ -391,10 +419,6 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
   );
 
   let specialEvent = null;
-  const taskDef = taskDefinitions[id];
-  const taskCfg = taskDef ? taskDef.taskConfig : null;
-  const taskTyp = taskDef ? taskDef.taskType : null;
-  const isEachMode = !!(taskCfg && taskCfg.mode === 'each');
 
   // For "each" mode: every listed entry must independently reach the per-item target.
   // completionsDone = sum of min(actual, perItemTarget) across all entries (used for the progress display).
@@ -458,7 +482,8 @@ async function submitTileProgress(team, id, playerName, amount, subCategory = nu
     specialEvent,
     progress: tile.completionsDone,
     target: tile.completionsRequired,
-    completed: tile.completed
+    completed: tile.completed,
+    contributed: true
   };
 }
 
@@ -544,6 +569,7 @@ app.post('/api/tiles/progress/:id', async (req, res, next) => {
       progress: result.progress,
       target: result.target,
       completed: result.completed,
+      contributed: result.contributed,
       specialEvent: result.specialEvent || null,
       tile: result.tile
     });

@@ -209,8 +209,8 @@ class TileInfoPanel extends JPanel {
         } else {
             for (TileProgressResponse.Contribution c : data.contributions) {
                 String text = (c.subCategory != null && !c.subCategory.isEmpty())
-                    ? c.playerName + ": " + c.amount + " " + c.subCategory
-                    : c.playerName + ": " + c.amount;
+                    ? c.playerName + ": " + String.format("%,d", c.amount) + " " + c.subCategory
+                    : c.playerName + ": " + String.format("%,d", c.amount);
                 JLabel l = new JLabel(text);
                 l.setForeground(new Color(170, 170, 170));
                 l.setFont(FontManager.getRunescapeSmallFont());

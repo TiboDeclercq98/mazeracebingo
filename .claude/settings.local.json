@@ -116,7 +116,11 @@
       "Bash(curl -s https://raw.githubusercontent.com/runelite/runelite/master/runelite-client/src/main/java/net/runelite/client/plugins/screenshot/ScreenshotPlugin.java)",
       "Bash(grep -i -E \"\\\\.java$\")",
       "Bash(xargs -I{} echo {})",
-      "Bash(./gradlew compileJava -q)"
+      "Bash(./gradlew compileJava -q)",
+      "Bash(find / -iname \"PluginPanel.java\" -o -iname \"runelite-client-*.jar\" 2>/dev/null | grep -v \"Permission denied\" | head -20)",
+      "Read(//tmp/runelite_sources_temp/net/runelite/client/ui/**)",
+      "Bash(cat /tmp/runelite_sources_temp/net/runelite/client/ui/PluginPanel.java 2>/dev/null | head -100)",
+      "Read(//c/Program Files/Java/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

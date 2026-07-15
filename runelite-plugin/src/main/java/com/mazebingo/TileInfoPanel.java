@@ -12,10 +12,15 @@ import java.awt.*;
 
 class TileInfoPanel extends JPanel {
 
+    // Caps how tall the contribution list can grow before it scrolls internally,
+    // so long lists stay fully reachable instead of getting clipped by the outer panel.
+    private static final int CONTRIB_MAX_HEIGHT = 140;
+
     private final JLabel titleLabel;
     private final JLabel taskLabel;
     private final JProgressBar progressBar;
     private final JPanel contribPanel;
+    private final JScrollPane contribScrollPane;
     private Runnable onClose;
 
     TileInfoPanel() {
@@ -83,13 +88,21 @@ class TileInfoPanel extends JPanel {
         contribPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         contribPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+        contribScrollPane = new JScrollPane(contribPanel,
+            ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+            ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        contribScrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+        contribScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        contribScrollPane.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        contribScrollPane.getViewport().setBackground(ColorScheme.DARKER_GRAY_COLOR);
+
         content.add(titleLabel);
         content.add(Box.createRigidArea(new Dimension(0, 3)));
         content.add(taskLabel);
         content.add(Box.createRigidArea(new Dimension(0, 4)));
         content.add(progressBar);
         content.add(Box.createRigidArea(new Dimension(0, 6)));
-        content.add(contribPanel);
+        content.add(contribScrollPane);
 
         add(header, BorderLayout.NORTH);
         add(content, BorderLayout.CENTER);
@@ -107,6 +120,8 @@ class TileInfoPanel extends JPanel {
         progressBar.setValue(0);
         progressBar.setString("…");
         contribPanel.removeAll();
+        contribScrollPane.setPreferredSize(new Dimension(contribScrollPane.getPreferredSize().width, 0));
+        contribScrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, 0));
         setVisible(true);
         revalidate();
         repaint();
@@ -202,6 +217,13 @@ class TileInfoPanel extends JPanel {
                 contribPanel.add(l);
             }
         }
+
+        int neededHeight = contribPanel.getPreferredSize().height;
+        int cappedHeight = Math.min(neededHeight, CONTRIB_MAX_HEIGHT);
+        Dimension currentPref = contribScrollPane.getPreferredSize();
+        contribScrollPane.setPreferredSize(new Dimension(currentPref.width, cappedHeight));
+        contribScrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, cappedHeight));
+        contribScrollPane.getVerticalScrollBar().setValue(0);
 
         setVisible(true);
         revalidate();

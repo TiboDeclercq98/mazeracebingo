@@ -233,6 +233,6 @@ public class MazeBingoPanel extends PluginPanel {
         if ("xp_gain".equals(tile.taskType)) {
             return String.format("%,d / %,d xp", tile.completionsDone, req);
         }
-        return tile.completionsDone + " / " + req;
+        return String.format("%,d / %,d", tile.completionsDone, req);
     }
 }

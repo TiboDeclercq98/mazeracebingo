@@ -141,8 +141,8 @@ class TileInfoPanel extends JPanel {
             if ("npc_kill".equals(data.taskType)) {
                 String npcLabel = buildListLabel(cfg, "npcs", "npc", eachMode);
                 taskLine = eachMode
-                    ? String.format("Kill each: %s — %d / %d kills", npcLabel, data.currentProgress, data.target)
-                    : String.format("Kill %s — %d / %d kills", npcLabel, data.currentProgress, data.target);
+                    ? String.format("Kill each: %s — %,d / %,d kills", npcLabel, data.currentProgress, data.target)
+                    : String.format("Kill %s — %,d / %,d kills", npcLabel, data.currentProgress, data.target);
             } else if ("xp_gain".equals(data.taskType)) {
                 String skillLabel = buildListLabel(cfg, "skills", "skill", eachMode);
                 if (eachMode) {
@@ -154,24 +154,24 @@ class TileInfoPanel extends JPanel {
             } else if ("item_drop".equals(data.taskType) || "loot_item".equals(data.taskType)) {
                 String itemLabel = buildListLabel(cfg, "items", "item", eachMode);
                 taskLine = eachMode
-                    ? String.format("Receive each: %s — %d / %d", itemLabel, data.currentProgress, data.target)
-                    : "Receive " + itemLabel + " — " + data.currentProgress + " / " + data.target;
+                    ? String.format("Receive each: %s — %,d / %,d", itemLabel, data.currentProgress, data.target)
+                    : String.format("Receive %s — %,d / %,d", itemLabel, data.currentProgress, data.target);
             } else if ("agility_lap".equals(data.taskType)) {
                 String courseLabel = buildListLabel(cfg, "courses", "course", eachMode);
                 taskLine = eachMode
-                    ? String.format("Complete laps of each: %s — %d / %d laps", courseLabel, data.currentProgress, data.target)
-                    : String.format("Complete laps of %s — %d / %d laps", courseLabel, data.currentProgress, data.target);
+                    ? String.format("Complete laps of each: %s — %,d / %,d laps", courseLabel, data.currentProgress, data.target)
+                    : String.format("Complete laps of %s — %,d / %,d laps", courseLabel, data.currentProgress, data.target);
             } else if ("minigame_completion".equals(data.taskType)) {
                 String minigameLabel = cfg.has("minigame") ? cfg.get("minigame").getAsString()
                     : cfg.has("message") ? cfg.get("message").getAsString() : "minigame";
-                taskLine = String.format("Complete %s — %d / %d", minigameLabel, data.currentProgress, data.target);
+                taskLine = String.format("Complete %s — %,d / %,d", minigameLabel, data.currentProgress, data.target);
             } else if ("gp_value".equals(data.taskType)) {
                 taskLine = String.format("Collect %,d gp — %,d / %,d gp", data.target, data.currentProgress, data.target);
             } else {
-                taskLine = "Progress: " + data.currentProgress + " / " + data.target;
+                taskLine = String.format("Progress: %,d / %,d", data.currentProgress, data.target);
             }
         } else {
-            taskLine = "Progress: " + data.currentProgress + " / " + data.target;
+            taskLine = String.format("Progress: %,d / %,d", data.currentProgress, data.target);
         }
         taskLabel.setText("<html>" + taskLine + "</html>");
 
@@ -181,7 +181,7 @@ class TileInfoPanel extends JPanel {
             ? String.format("%,d / %,d xp", data.currentProgress, data.target)
             : "gp_value".equals(data.taskType)
             ? String.format("%,d / %,d gp", data.currentProgress, data.target)
-            : data.currentProgress + " / " + data.target);
+            : String.format("%,d / %,d", data.currentProgress, data.target));
 
         contribPanel.removeAll();
         if (eachMode && data.itemProgress != null && !data.itemProgress.isEmpty()) {
@@ -193,8 +193,8 @@ class TileInfoPanel extends JPanel {
                 contribPanel.add(Box.createRigidArea(new Dimension(0, 2)));
                 for (TileProgressResponse.Contribution c : data.contributions) {
                     String text = (c.subCategory != null && !c.subCategory.isEmpty())
-                        ? c.playerName + ": " + c.amount + " " + c.subCategory
-                        : c.playerName + ": " + c.amount;
+                        ? c.playerName + ": " + String.format("%,d", c.amount) + " " + c.subCategory
+                        : c.playerName + ": " + String.format("%,d", c.amount);
                     JLabel l = new JLabel(text);
                     l.setForeground(new Color(140, 140, 140));
                     l.setFont(FontManager.getRunescapeSmallFont());
@@ -258,7 +258,7 @@ class TileInfoPanel extends JPanel {
         JProgressBar bar = new JProgressBar(0, ip.target);
         bar.setValue(ip.progress);
         bar.setStringPainted(true);
-        bar.setString(ip.progress + " / " + ip.target);
+        bar.setString(String.format("%,d / %,d", ip.progress, ip.target));
         bar.setForeground(ip.progress >= ip.target ? new Color(76, 175, 80) : new Color(100, 149, 237));
         bar.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
         bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 14));

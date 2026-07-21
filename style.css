@@ -292,6 +292,12 @@ body {
   min-width: 0;
 }
 
+#draw-tasks-modal-content {
+  width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
 .tile.boobytrap {
     color: red !important;
     font-weight: bold;

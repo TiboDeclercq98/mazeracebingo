@@ -518,20 +518,50 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DRAW MODE (maze layout editor — builds save files consumed by POST /api/create) ---
     // Restored from the pre-API version of this app (commit 7a50d1f); adapted to write
     // save-file JSON instead of localStorage, since the live app is now server-backed.
+    // Output format matches "Save files/Maggot-King.json" exactly: saveData.{size,
+    // mazeWalls, tileDescriptions, boobytraps, taskDefinitions (array)}.
     const DRAW_SIZE = 9; // matches the SIZE constant in maze-api.js
     const drawPopupBtn = document.getElementById('draw-popup-btn');
     const drawModal = document.getElementById('draw-modal');
     const closeDrawModal = document.getElementById('close-draw-modal');
     const drawGrid = document.getElementById('draw-grid');
 
+    // Task types the plugin/server understand, and which of them support "mode: each"
+    // (see getEachModeItems in maze-api.js and MazeBingoPlugin.java's matchingTiles calls).
+    const TASK_TYPES = [
+        { value: '', label: 'No task' },
+        { value: 'npc_kill', label: 'Kill NPC(s)' },
+        { value: 'xp_gain', label: 'Gain XP' },
+        { value: 'item_drop', label: 'Receive item(s)' },
+        { value: 'agility_lap', label: 'Agility laps' },
+        { value: 'minigame_completion', label: 'Minigame completion' },
+        { value: 'gp_value', label: 'GP value' }
+    ];
+    const EACH_MODE_TYPES = ['npc_kill', 'xp_gain', 'item_drop', 'agility_lap'];
+    const OSRS_SKILLS = [
+        'Attack', 'Defence', 'Strength', 'Hitpoints', 'Ranged', 'Prayer', 'Magic',
+        'Cooking', 'Woodcutting', 'Fletching', 'Fishing', 'Firemaking', 'Crafting',
+        'Smithing', 'Mining', 'Herblore', 'Agility', 'Thieving', 'Slayer', 'Farming',
+        'Runecraft', 'Hunter', 'Construction'
+    ];
+    // Matches COURSE_ENDPOINTS keys in MazeBingoPlugin.java — the courses the plugin can detect.
+    const AGILITY_COURSES = [
+        'Gnome', 'Draynor', 'Al Kharid', 'Varrock', 'Barbarian', 'Canifis', 'Falador',
+        "Seers' Village", 'Pollnivneach', 'Rellekka', 'Ardougne', 'Pyramid', 'Wilderness',
+        'Werewolf', 'Prifddinas', 'Shayzien Basic', 'Shayzien Advanced', 'Penguin', 'Ape Atoll'
+    ];
+
     let drawTiles = [];
     let drawSelected = null;
     let drawInitialized = false;
     let drawTileDescriptions = {};
-    let drawTrapDescriptions = {};
+    // Keyed by tileId (number) -> { taskType, taskConfig }. Absent = no task assigned.
+    let drawTaskDefinitions = {};
 
     function drawStartCoord() { return { row: DRAW_SIZE - 1, col: Math.floor(DRAW_SIZE / 2) }; }
     function drawEndCoord()   { return { row: 0, col: Math.floor(DRAW_SIZE / 2) }; }
+    function drawStartId() { const c = drawStartCoord(); return c.row * DRAW_SIZE + c.col + 1; }
+    function drawEndId()   { const c = drawEndCoord();   return c.row * DRAW_SIZE + c.col + 1; }
 
     // Builds a fresh grid where every tile is walled off on all 4 sides — the blank
     // canvas the designer carves paths into by clicking pairs of adjacent tiles.
@@ -594,13 +624,13 @@ document.addEventListener('DOMContentLoaded', () => {
         drawSelected = null;
     }
 
-    // Right-click toggles a boobytrap (key) on a tile.
+    // Right-click toggles a Key (boobytrap) on a tile.
     function handleDrawTileRightClick(e, tile) {
         e.preventDefault();
         tile.classList.toggle('boobytrap');
-        const drawTrapsModal = document.getElementById('draw-traps-modal');
-        if (drawTrapsModal && drawTrapsModal.style.display === 'block') {
-            renderDrawTrapsList();
+        const drawKeysModal = document.getElementById('draw-keys-modal');
+        if (drawKeysModal && drawKeysModal.style.display === 'block') {
+            renderDrawKeysList();
         }
     }
 
@@ -608,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!drawInitialized) {
             buildBlankDrawGrid();
             drawTileDescriptions = {};
-            drawTrapDescriptions = {};
+            drawTaskDefinitions = {};
             drawInitialized = true;
         }
         drawModal.style.display = 'block';
@@ -631,8 +661,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
     }
 
-    // Save: download a save file shaped exactly like POST /api/create's expected body
-    // (see files in "Save files/"), ready to be posted as-is to create a live maze.
+    // Save: download a save file shaped exactly like "Save files/Maggot-King.json" and
+    // POST /api/create's expected body, ready to be posted as-is to create a live maze.
     const drawSaveBtn = document.getElementById('draw-save-btn');
     if (drawSaveBtn) drawSaveBtn.onclick = () => {
         const mazeWalls = [];
@@ -651,21 +681,40 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (tile.classList.contains('boobytrap')) boobytraps.push({ row, col });
         }
+
+        // Integer-like string keys are always enumerated in ascending numeric order by
+        // JS, so this serializes as "1", "2", ... regardless of edit order.
+        const tileDescriptionsOut = {};
+        Object.keys(drawTileDescriptions).forEach(id => {
+            const v = (drawTileDescriptions[id] || '').trim();
+            if (v) tileDescriptionsOut[id] = v;
+        });
+
+        const taskDefinitionsOut = Object.keys(drawTaskDefinitions)
+            .map(id => parseInt(id, 10))
+            .sort((a, b) => a - b)
+            .map(id => ({
+                tileId: id,
+                taskType: drawTaskDefinitions[id].taskType,
+                taskConfig: drawTaskDefinitions[id].taskConfig
+            }));
+
         downloadJson({
             saveData: {
                 size: DRAW_SIZE,
                 mazeWalls,
+                tileDescriptions: tileDescriptionsOut,
                 boobytraps,
-                tileDescriptions: { ...drawTileDescriptions },
-                trapDescriptions: { ...drawTrapDescriptions },
-                taskDefinitions: {}
+                taskDefinitions: taskDefinitionsOut
             }
         }, 'maze-save.json');
     };
 
     // Rebuilds the draw grid from a previously saved (or hand-edited) save file.
     // Accepts both the wrapped `{ saveData: {...} }` shape used by /api/create
-    // and a bare `{ mazeWalls, ... }` shape for backward compatibility.
+    // and a bare `{ mazeWalls, ... }` shape for backward compatibility. taskDefinitions
+    // may be the array form (as saved) or an object keyed by tileId (also accepted by
+    // /api/create), for compatibility with hand-edited files.
     function loadDrawState(data) {
         buildBlankDrawGrid();
         for (const tile of drawTiles) {
@@ -685,7 +734,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tile) tile.classList.add('boobytrap');
         });
         drawTileDescriptions = { ...(data.tileDescriptions || {}) };
-        drawTrapDescriptions = { ...(data.trapDescriptions || {}) };
+
+        drawTaskDefinitions = {};
+        const rawTaskDefs = data.taskDefinitions;
+        if (Array.isArray(rawTaskDefs)) {
+            rawTaskDefs.forEach(d => {
+                drawTaskDefinitions[d.tileId] = { taskType: d.taskType, taskConfig: d.taskConfig };
+            });
+        } else if (rawTaskDefs && typeof rawTaskDefs === 'object') {
+            Object.entries(rawTaskDefs).forEach(([tileId, def]) => {
+                drawTaskDefinitions[tileId] = { taskType: def.taskType, taskConfig: def.taskConfig };
+            });
+        }
         drawInitialized = true;
     }
 
@@ -716,7 +776,179 @@ document.addEventListener('DOMContentLoaded', () => {
         input.click();
     };
 
-    // Draw Tasks modal: edit each tile's description before saving.
+    // --- DRAW TASKS MODAL: per-tile editor for tileDescriptions + taskDefinitions ---
+
+    function makeLabeledRow(labelText, inputEl) {
+        const row = document.createElement('div');
+        row.style.cssText = 'margin-bottom:6px;';
+        const lbl = document.createElement('label');
+        lbl.textContent = labelText;
+        lbl.style.cssText = 'display:block;font-size:0.8em;color:#555;margin-bottom:2px;';
+        row.appendChild(lbl);
+        row.appendChild(inputEl);
+        return row;
+    }
+
+    function makeTextField(value, placeholder, onChange) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = value || '';
+        input.placeholder = placeholder || '';
+        input.style.cssText = 'width:100%;box-sizing:border-box;padding:3px 6px;';
+        input.addEventListener('input', () => onChange(input.value));
+        return input;
+    }
+
+    function makeNumberField(value, onChange) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '1';
+        input.value = value || 1;
+        input.style.cssText = 'width:100%;box-sizing:border-box;padding:3px 6px;';
+        input.addEventListener('input', () => onChange(Math.max(1, parseInt(input.value, 10) || 1)));
+        return input;
+    }
+
+    function makeMultiSelect(options, selectedValues, onChange) {
+        const select = document.createElement('select');
+        select.multiple = true;
+        select.size = Math.min(6, options.length);
+        select.style.cssText = 'width:100%;';
+        options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            if (selectedValues.includes(opt)) o.selected = true;
+            select.appendChild(o);
+        });
+        select.addEventListener('change', () => {
+            onChange(Array.from(select.selectedOptions).map(o => o.value));
+        });
+        return select;
+    }
+
+    function makeCheckboxRow(checked, labelText, onChange) {
+        const wrap = document.createElement('label');
+        wrap.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0 2px;font-size:0.85em;';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!checked;
+        cb.addEventListener('change', () => onChange(cb.checked));
+        wrap.appendChild(cb);
+        wrap.appendChild(document.createTextNode(labelText));
+        return wrap;
+    }
+
+    // Reads a name-list field that may be stored as a singular key ("npc": "X") or a
+    // plural array key ("npcs": ["X","Y"]) — mirrors buildListLabel's input shape.
+    function getListFieldValue(cfg, pluralKey, singularKey) {
+        if (Array.isArray(cfg[pluralKey])) return cfg[pluralKey];
+        if (cfg[singularKey]) return [cfg[singularKey]];
+        return [];
+    }
+
+    // Writes a name list back using the same singular/plural convention as the save files:
+    // a single name uses the singular key, multiple names use the plural array key.
+    function setListField(cfg, pluralKey, singularKey, names) {
+        delete cfg[pluralKey];
+        delete cfg[singularKey];
+        const clean = names.map(s => s.trim()).filter(Boolean);
+        if (clean.length > 1) cfg[pluralKey] = clean;
+        else if (clean.length === 1) cfg[singularKey] = clean[0];
+    }
+
+    // Builds the dynamic config fields for a tile's task editor row, based on the
+    // currently selected task type. Mirrors the taskType/taskConfig shapes read by
+    // TileInfoPanel.showTile and getEachModeItems in maze-api.js.
+    function renderDrawTaskFields(container, tileId, type) {
+        container.innerHTML = '';
+        if (!type) {
+            delete drawTaskDefinitions[tileId];
+            return;
+        }
+        const prevDef = drawTaskDefinitions[tileId];
+        const cfg = (prevDef && prevDef.taskType === type) ? prevDef.taskConfig : {};
+        drawTaskDefinitions[tileId] = { taskType: type, taskConfig: cfg };
+
+        if (type === 'npc_kill') {
+            container.appendChild(makeLabeledRow('NPC name(s), comma-separated',
+                makeTextField(getListFieldValue(cfg, 'npcs', 'npc').join(', '), 'e.g. Goblin, Cow',
+                    v => setListField(cfg, 'npcs', 'npc', v.split(',')))));
+            container.appendChild(makeLabeledRow('Target (kills)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
+        } else if (type === 'xp_gain') {
+            container.appendChild(makeLabeledRow('Skill(s)',
+                makeMultiSelect(OSRS_SKILLS, getListFieldValue(cfg, 'skills', 'skill'),
+                    v => setListField(cfg, 'skills', 'skill', v))));
+            container.appendChild(makeLabeledRow('Target (XP)', makeNumberField(cfg.target || 1000, v => cfg.target = v)));
+        } else if (type === 'item_drop') {
+            container.appendChild(makeLabeledRow('Item name(s), comma-separated',
+                makeTextField(getListFieldValue(cfg, 'items', 'item').join(', '), 'e.g. Rune scimitar, Dragon bones',
+                    v => setListField(cfg, 'items', 'item', v.split(',')))));
+            container.appendChild(makeLabeledRow('Target (count)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
+        } else if (type === 'agility_lap') {
+            container.appendChild(makeLabeledRow('Course(s)',
+                makeMultiSelect(AGILITY_COURSES, getListFieldValue(cfg, 'courses', 'course'),
+                    v => setListField(cfg, 'courses', 'course', v))));
+            container.appendChild(makeLabeledRow('Target (laps)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
+        } else if (type === 'minigame_completion') {
+            container.appendChild(makeLabeledRow('Chat message match',
+                makeTextField(cfg.message || '', 'substring of the chat message', v => cfg.message = v)));
+            container.appendChild(makeLabeledRow('Minigame label (optional)',
+                makeTextField(cfg.minigame || '', 'defaults to the message', v => cfg.minigame = v)));
+            container.appendChild(makeLabeledRow('Target (completions)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
+        } else if (type === 'gp_value') {
+            container.appendChild(makeLabeledRow('Target (gp)', makeNumberField(cfg.target || 100000, v => cfg.target = v)));
+        }
+
+        if (EACH_MODE_TYPES.includes(type)) {
+            container.appendChild(makeCheckboxRow(cfg.mode === 'each', 'Each item independently (mode: each)', checked => {
+                if (checked) cfg.mode = 'each'; else delete cfg.mode;
+            }));
+        }
+    }
+
+    function buildDrawTaskRow(tileId) {
+        const li = document.createElement('li');
+        li.style.cssText = 'margin-bottom:14px;padding:8px;border:1px solid #e0e0e0;border-radius:4px;list-style:none;';
+
+        const label = document.createElement('div');
+        label.style.cssText = 'font-weight:bold;margin-bottom:4px;';
+        const tag = tileId === drawStartId() ? ' (START)' : tileId === drawEndId() ? ' (END)' : '';
+        label.textContent = `Tile ${tileId}${tag}`;
+        li.appendChild(label);
+
+        li.appendChild(makeTextField(drawTileDescriptions[tileId] || '', 'Description...',
+            v => { drawTileDescriptions[tileId] = v; }));
+
+        const typeRow = document.createElement('div');
+        typeRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:6px 0;';
+        const typeLabel = document.createElement('span');
+        typeLabel.textContent = 'Task:';
+        typeLabel.style.fontSize = '0.85em';
+        const typeSelect = document.createElement('select');
+        TASK_TYPES.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.value;
+            opt.textContent = t.label;
+            typeSelect.appendChild(opt);
+        });
+        const existing = drawTaskDefinitions[tileId];
+        typeSelect.value = existing ? existing.taskType : '';
+        typeRow.appendChild(typeLabel);
+        typeRow.appendChild(typeSelect);
+        li.appendChild(typeRow);
+
+        const fieldsContainer = document.createElement('div');
+        li.appendChild(fieldsContainer);
+
+        typeSelect.addEventListener('change', () => renderDrawTaskFields(fieldsContainer, tileId, typeSelect.value));
+        renderDrawTaskFields(fieldsContainer, tileId, typeSelect.value);
+
+        return li;
+    }
+
+    // Draw Tasks modal: guides the user through building both tileDescriptions and
+    // taskDefinitions for every tile, ready to be written out by the Save button.
     const drawTasksBtn = document.getElementById('draw-tasks-btn');
     const drawTasksModal = document.getElementById('draw-tasks-modal');
     const closeDrawTasksModal = document.getElementById('close-draw-tasks-modal');
@@ -724,22 +956,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (drawTasksBtn && drawTasksModal && closeDrawTasksModal) {
         drawTasksBtn.onclick = () => {
-            const start = drawStartCoord(), end = drawEndCoord();
-            const startId = start.row * DRAW_SIZE + start.col + 1;
-            const endId = end.row * DRAW_SIZE + end.col + 1;
-            let html = '<ul style="list-style:none;padding-left:0">';
+            drawTasksList.innerHTML = '';
+            const ul = document.createElement('ul');
+            ul.style.cssText = 'list-style:none;padding-left:0;margin:0;';
             for (let id = 1; id <= DRAW_SIZE * DRAW_SIZE; id++) {
-                if (id === startId || id === endId) continue;
-                const desc = drawTileDescriptions[id] || '';
-                html += `<li style='margin-bottom:8px;'>Tile ${id}: <input type='text' data-tileid='${id}' value="${escapeHtml(desc)}" style='width:220px;'/></li>`;
+                ul.appendChild(buildDrawTaskRow(id));
             }
-            html += '</ul>';
-            drawTasksList.innerHTML = html;
-            drawTasksList.querySelectorAll('input[data-tileid]').forEach(input => {
-                input.addEventListener('input', () => {
-                    drawTileDescriptions[input.dataset.tileid] = input.value;
-                });
-            });
+            drawTasksList.appendChild(ul);
             drawTasksModal.style.display = 'block';
         };
         closeDrawTasksModal.onclick = () => { drawTasksModal.style.display = 'none'; };
@@ -748,42 +971,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Draw Traps modal: edit descriptions for tiles currently marked as boobytraps.
-    const drawTrapsBtn = document.getElementById('draw-traps-btn');
-    const drawTrapsModal = document.getElementById('draw-traps-modal');
-    const closeDrawTrapsModal = document.getElementById('close-draw-traps-modal');
-    const drawTrapsList = document.getElementById('draw-traps-list');
+    // Draw Keys modal (formerly "Traps"): read-only — just the instructions and a
+    // list of currently marked tiles. Keys have no description field in the save
+    // format (the boobytraps table only stores row/col), so none is offered here.
+    const drawKeysBtn = document.getElementById('draw-keys-btn');
+    const drawKeysModal = document.getElementById('draw-keys-modal');
+    const closeDrawKeysModal = document.getElementById('close-draw-keys-modal');
+    const drawKeysList = document.getElementById('draw-keys-list');
 
-    function renderDrawTrapsList() {
-        const trapTiles = drawTiles.filter(t => t.classList.contains('boobytrap'));
-        if (!trapTiles.length) {
-            drawTrapsList.innerHTML = '<em>No traps placed. Right-click a tile in the Draw grid to add one.</em>';
-            return;
-        }
-        let html = '<ul style="list-style:none;padding-left:0">';
-        trapTiles.forEach(tile => {
+    function renderDrawKeysList() {
+        const keyTiles = drawTiles.filter(t => t.classList.contains('boobytrap'));
+        const ids = keyTiles.map(tile => {
             const row = parseInt(tile.dataset.row, 10), col = parseInt(tile.dataset.col, 10);
-            const id = row * DRAW_SIZE + col + 1;
-            const desc = drawTrapDescriptions[id] || '';
-            html += `<li style='margin-bottom:8px;'>Tile ${id}: <input type='text' data-tileid='${id}' value="${escapeHtml(desc)}" style='width:220px;'/></li>`;
-        });
-        html += '</ul>';
-        drawTrapsList.innerHTML = html;
-        drawTrapsList.querySelectorAll('input[data-tileid]').forEach(input => {
-            input.addEventListener('input', () => {
-                drawTrapDescriptions[input.dataset.tileid] = input.value;
-            });
-        });
+            return row * DRAW_SIZE + col + 1;
+        }).sort((a, b) => a - b);
+
+        const instructions = '<p style="margin:0 0 10px;font-size:0.9em;color:#555;">' +
+            'Right-click a tile in the Draw grid to mark or unmark it as a Key. ' +
+            'Completing every Key tile is required to unlock the END tile.</p>';
+        const list = ids.length
+            ? '<ul style="padding-left:18px;margin:0;">' + ids.map(id => `<li>Tile ${id}</li>`).join('') + '</ul>'
+            : '<em>No Keys marked yet.</em>';
+        drawKeysList.innerHTML = instructions + list;
     }
 
-    if (drawTrapsBtn && drawTrapsModal && closeDrawTrapsModal) {
-        drawTrapsBtn.onclick = () => {
-            renderDrawTrapsList();
-            drawTrapsModal.style.display = 'block';
+    if (drawKeysBtn && drawKeysModal && closeDrawKeysModal) {
+        drawKeysBtn.onclick = () => {
+            renderDrawKeysList();
+            drawKeysModal.style.display = 'block';
         };
-        closeDrawTrapsModal.onclick = () => { drawTrapsModal.style.display = 'none'; };
+        closeDrawKeysModal.onclick = () => { drawKeysModal.style.display = 'none'; };
         window.addEventListener('click', event => {
-            if (event.target === drawTrapsModal) drawTrapsModal.style.display = 'none';
+            if (event.target === drawKeysModal) drawKeysModal.style.display = 'none';
         });
     }
     // --- END DRAW MODE ---

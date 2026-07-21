@@ -120,7 +120,15 @@
       "Bash(find / -iname \"PluginPanel.java\" -o -iname \"runelite-client-*.jar\" 2>/dev/null | grep -v \"Permission denied\" | head -20)",
       "Read(//tmp/runelite_sources_temp/net/runelite/client/ui/**)",
       "Bash(cat /tmp/runelite_sources_temp/net/runelite/client/ui/PluginPanel.java 2>/dev/null | head -100)",
-      "Read(//c/Program Files/Java/**)"
+      "Read(//c/Program Files/Java/**)",
+      "Bash(xxd)",
+      "Bash(node --check script.js)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' http://localhost:8123/)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' http://localhost:8123/script.js)",
+      "Bash(kill %1)",
+      "Bash(taskkill //F //IM node.exe //FI \"WINDOWTITLE eq *\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 2540)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

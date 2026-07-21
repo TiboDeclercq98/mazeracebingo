@@ -9,6 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return params.get('team') || 'default';
     }
 
+    // --- CONNECTION STATUS (mirrors the RuneLite plugin's status label) ---
+    const statusIndicator = document.getElementById('status-indicator');
+    function setStatus(connected) {
+        if (!statusIndicator) return;
+        statusIndicator.textContent = connected ? '● Connected' : '● Disconnected';
+        statusIndicator.classList.toggle('connected', connected);
+    }
+
     // --- API-DRIVEN MAZE RENDERING ---
     async function fetchMazeState() {
         const team       = getTeamFromUrl();
@@ -17,9 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`${API_BASE}/api/maze?team=${encodeURIComponent(team)}`, { signal: controller.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return await res.json();
+            const data = await res.json();
+            setStatus(true);
+            return data;
         } catch (err) {
             console.error('Failed to fetch maze state:', err);
+            setStatus(false);
             return null;
         } finally {
             clearTimeout(timeoutId);
@@ -247,6 +258,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     return `<li>Tile ${t.id}: ${desc}</li>`;
                 }).join('') + '</ul>';
         }
+
+        renderEventsFeed(state);
+    }
+
+    // --- RECENT EVENTS FEED (mirrors the RuneLite plugin's "Recent Events" panel) ---
+    const MAX_EVENTS = 8;
+    function eventColor(type) {
+        if (type === 'tile_complete') return '#000';
+        if (type === 'keys_missing')  return '#e53935';
+        if (type === 'gameover')      return '#4caf50';
+        return '#c9960c'; // boobytrap / other special events
+    }
+
+    function renderEventsFeed(state) {
+        const eventsPanel = document.getElementById('events-panel');
+        if (!eventsPanel) return;
+        const events = (state.recentEvents || []).slice(-MAX_EVENTS);
+        if (!events.length) {
+            eventsPanel.innerHTML = '<b>Recent Events:</b><div style="color:#888;margin-top:6px;">No events yet</div>';
+            return;
+        }
+        eventsPanel.innerHTML = '<b>Recent Events:</b><ul>' +
+            events.map(e => `<li style="color:${eventColor(e.type)};">${escapeHtml(e.message)}</li>`).join('') +
+            '</ul>';
     }
 
     // --- PROGRESS MODAL ---
@@ -258,35 +293,100 @@ document.addEventListener('DOMContentLoaded', () => {
     closeProgressModal.addEventListener('click', () => { progressModal.style.display = 'none'; });
     window.addEventListener('click', e => { if (e.target === progressModal) progressModal.style.display = 'none'; });
 
+    // Joins a list field from taskConfig. In each mode, all names are comma-separated.
+    // In shared mode, the last item is joined with "or". Mirrors TileInfoPanel.buildListLabel.
+    function buildListLabel(cfg, pluralKey, singularKey, eachMode) {
+        const names = Array.isArray(cfg[pluralKey]) ? cfg[pluralKey] : (cfg[singularKey] ? [cfg[singularKey]] : null);
+        if (!names) return '?';
+        if (!eachMode && names.length > 1) {
+            return names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1];
+        }
+        return names.join(', ');
+    }
+
+    // Builds the task description line for a tile. Mirrors TileInfoPanel.showTile's taskLine logic.
+    function buildTaskLine(data) {
+        const cfg = data.taskConfig;
+        if (!cfg) return `Progress: ${data.currentProgress.toLocaleString()} / ${data.target.toLocaleString()}`;
+        const eachMode = cfg.mode === 'each';
+        const cur = data.currentProgress, tgt = data.target;
+
+        if (data.taskType === 'npc_kill') {
+            const npcLabel = buildListLabel(cfg, 'npcs', 'npc', eachMode);
+            return eachMode
+                ? `Kill each: <b>${npcLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()} kills`
+                : `Kill <b>${npcLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()} kills`;
+        }
+        if (data.taskType === 'xp_gain') {
+            const skillLabel = buildListLabel(cfg, 'skills', 'skill', eachMode);
+            if (eachMode) {
+                const perItemTarget = cfg.target ?? tgt;
+                return `Gain ${perItemTarget.toLocaleString()} XP each: <b>${skillLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`;
+            }
+            return `Gain <b>${tgt.toLocaleString()} ${skillLabel} XP</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`;
+        }
+        if (data.taskType === 'item_drop' || data.taskType === 'loot_item') {
+            const itemLabel = buildListLabel(cfg, 'items', 'item', eachMode);
+            return eachMode
+                ? `Receive each: <b>${itemLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`
+                : `Receive <b>${itemLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`;
+        }
+        if (data.taskType === 'agility_lap') {
+            const courseLabel = buildListLabel(cfg, 'courses', 'course', eachMode);
+            return eachMode
+                ? `Complete laps of each: <b>${courseLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()} laps`
+                : `Complete laps of <b>${courseLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()} laps`;
+        }
+        if (data.taskType === 'minigame_completion') {
+            const minigameLabel = cfg.minigame || cfg.message || 'minigame';
+            return `Complete <b>${escapeHtml(minigameLabel)}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`;
+        }
+        if (data.taskType === 'gp_value') {
+            return `Collect <b>${tgt.toLocaleString()} gp</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()} gp`;
+        }
+        return `Progress: ${cur.toLocaleString()} / ${tgt.toLocaleString()}`;
+    }
+
     async function openProgressModal(tileData, state) {
         const team   = getTeamFromUrl();
         const tileId = tileData.id;
         const desc   = (state.tileDescriptions || {})[tileId] || '';
+        const row    = Math.floor((tileId - 1) / state.size);
+        const col    = (tileId - 1) % state.size;
+        const isBoobytrap = tileData.completed && (state.boobytraps || []).some(b => b.row === row && b.col === col);
         progressModalTitle.textContent = `Tile ${tileId}${desc ? ': ' + desc : ''}`;
+        progressModalTitle.style.color = isBoobytrap ? '#e53935' : '';
         progressModalBody.innerHTML = '<em>Loading...</em>';
         progressModal.style.display = 'block';
         try {
             const res  = await fetch(`${API_BASE}/api/tiles/progress/${tileId}?team=${encodeURIComponent(team)}`);
             const data = await res.json();
-            const cfg  = data.taskConfig;
-            let taskLine = '';
-            if (data.taskType === 'npc_kill')  taskLine = `Kill <b>${data.target} ${cfg.npc}</b> — ${data.currentProgress} / ${data.target}`;
-            else if (data.taskType === 'xp_gain')   taskLine = `Gain <b>${data.target.toLocaleString()} ${cfg.skill} XP</b> — ${data.currentProgress.toLocaleString()} / ${data.target.toLocaleString()}`;
-            else if (data.taskType === 'item_drop')  { 
-                const items = cfg.items ?? [cfg.item];
-                const itemLabel = items.length > 1 ? items.slice(0, -1).join(', ') + ' or ' + items[items.length - 1] : items[0];
-                taskLine = `Receive <b>${itemLabel}</b> — ${data.currentProgress} / ${data.target}`; 
-            }
-            else taskLine = `Progress: ${data.currentProgress} / ${data.target}`;
-            const pct  = Math.min(100, Math.round((data.currentProgress / data.target) * 100));
+            const eachMode = data.taskConfig && data.taskConfig.mode === 'each';
+            const taskLine = buildTaskLine(data);
+            const pct  = data.target > 0 ? Math.min(100, Math.round((data.currentProgress / data.target) * 100)) : 0;
+
+            const itemProgressRows = (eachMode && data.itemProgress && data.itemProgress.length)
+                ? data.itemProgress.map(ip => {
+                    const ipPct = ip.target > 0 ? Math.min(100, Math.round((ip.progress / ip.target) * 100)) : 0;
+                    return `<div style="margin-bottom:6px;">
+                        <div style="font-size:0.85em;margin-bottom:2px;">${escapeHtml(ip.name)}</div>
+                        <div style="background:#ddd;border-radius:4px;height:12px;">
+                            <div style="background:${ip.progress >= ip.target ? '#4caf50' : '#6495ed'};width:${ipPct}%;height:100%;border-radius:4px;"></div>
+                        </div>
+                    </div>`;
+                }).join('')
+                : '';
+
             const contribRows = data.contributions.length
-                ? data.contributions.map(c => `<tr><td>${escapeHtml(c.playerName)}</td><td>${c.amount}${c.subCategory ? ' ' + escapeHtml(c.subCategory) : ''}</td></tr>`).join('')
+                ? data.contributions.map(c => `<tr><td>${escapeHtml(c.playerName)}</td><td>${c.amount.toLocaleString()}${c.subCategory ? ' ' + escapeHtml(c.subCategory) : ''}</td></tr>`).join('')
                 : '<tr><td colspan="2"><em>No progress yet</em></td></tr>';
+
             progressModalBody.innerHTML = `
                 <p>${taskLine}</p>
                 <div style="background:#ddd;border-radius:4px;height:14px;margin-bottom:12px;">
                     <div style="background:#4caf50;width:${pct}%;height:100%;border-radius:4px;"></div>
                 </div>
+                ${itemProgressRows}
                 <table style="width:100%;border-collapse:collapse;">
                     <thead><tr style="text-align:left;border-bottom:1px solid #ccc;">
                         <th style="padding:4px 8px;">Player</th>

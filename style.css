@@ -223,8 +223,44 @@ body {
     min-height: 40px;
     max-width: 400px;
     word-break: break-word;
-    max-height: 80vh;
+    max-height: 40vh;
     overflow-y: auto;
+}
+
+#status-indicator {
+    margin-right: 20px;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #e53935;
+}
+
+#status-indicator.connected {
+    color: #4caf50;
+}
+
+#events-panel {
+    margin-right: 20px;
+    margin-top: 12px;
+    margin-bottom: 0;
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    max-width: 400px;
+    max-height: 30vh;
+    overflow-y: auto;
+    word-break: break-word;
+}
+
+#events-panel ul {
+    margin: 6px 0 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+#events-panel li {
+    padding: 2px 0;
 }
 
 #main-container > div {

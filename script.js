@@ -550,7 +550,11 @@ document.addEventListener('DOMContentLoaded', () => {
         { minigame: 'Wintertodt', message: 'subdued Wintertodt count is' },
         { minigame: 'Tempoross', message: 'Tempoross kill count is' },
         { minigame: 'Guardians of the Rift', message: 'Amount of rifts you have closed' },
-        { minigame: 'Hallowed Sepulchre', message: 'completed Floor 5 of the Hallowed Sepulchre' }
+        { minigame: 'Hallowed Sepulchre (Floor 1)', message: 'completed Floor 1 of the Hallowed Sepulchre' },
+        { minigame: 'Hallowed Sepulchre (Floor 2)', message: 'completed Floor 2 of the Hallowed Sepulchre' },
+        { minigame: 'Hallowed Sepulchre (Floor 3)', message: 'completed Floor 3 of the Hallowed Sepulchre' },
+        { minigame: 'Hallowed Sepulchre (Floor 4)', message: 'completed Floor 4 of the Hallowed Sepulchre' },
+        { minigame: 'Hallowed Sepulchre (Floor 5)', message: 'completed Floor 5 of the Hallowed Sepulchre' }
     ];
     // Matches COURSE_ENDPOINTS keys in MazeBingoPlugin.java — the courses the plugin can detect.
     const AGILITY_COURSES = [
@@ -899,7 +903,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     v => setListField(cfg, 'courses', 'course', v))));
             container.appendChild(makeLabeledRow('Target (laps)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
         } else if (type === 'minigame_completion') {
-            const matchIdx = MINIGAME_COMPLETIONS.findIndex(m => m.message === cfg.message && m.minigame === cfg.minigame);
+            // Matched by message alone — it's the field that actually drives chat matching;
+            // "minigame" is just a display label, so a differing label shouldn't force Custom.
+            const matchIdx = MINIGAME_COMPLETIONS.findIndex(m => m.message === cfg.message);
             const minigameSelect = document.createElement('select');
             minigameSelect.style.cssText = 'width:100%;';
             MINIGAME_COMPLETIONS.forEach((m, i) => {

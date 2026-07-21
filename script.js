@@ -542,7 +542,15 @@ document.addEventListener('DOMContentLoaded', () => {
         'Attack', 'Defence', 'Strength', 'Hitpoints', 'Ranged', 'Prayer', 'Magic',
         'Cooking', 'Woodcutting', 'Fletching', 'Fishing', 'Firemaking', 'Crafting',
         'Smithing', 'Mining', 'Herblore', 'Agility', 'Thieving', 'Slayer', 'Farming',
-        'Runecraft', 'Hunter', 'Construction'
+        'Runecraft', 'Hunter', 'Construction', 'Sailing'
+    ];
+    // Known "message" substrings this project has already validated against real chat
+    // output (see Save files/Test-plugin-2.json, -3.json) for minigame_completion tasks.
+    const MINIGAME_COMPLETIONS = [
+        { minigame: 'Wintertodt', message: 'subdued Wintertodt count is' },
+        { minigame: 'Tempoross', message: 'Tempoross kill count is' },
+        { minigame: 'Guardians of the Rift', message: 'Amount of rifts you have closed' },
+        { minigame: 'Hallowed Sepulchre', message: 'completed Floor 5 of the Hallowed Sepulchre' }
     ];
     // Matches COURSE_ENDPOINTS keys in MazeBingoPlugin.java — the courses the plugin can detect.
     const AGILITY_COURSES = [
@@ -891,10 +899,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     v => setListField(cfg, 'courses', 'course', v))));
             container.appendChild(makeLabeledRow('Target (laps)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
         } else if (type === 'minigame_completion') {
-            container.appendChild(makeLabeledRow('Chat message match',
-                makeTextField(cfg.message || '', 'substring of the chat message', v => cfg.message = v)));
-            container.appendChild(makeLabeledRow('Minigame label (optional)',
-                makeTextField(cfg.minigame || '', 'defaults to the message', v => cfg.minigame = v)));
+            const matchIdx = MINIGAME_COMPLETIONS.findIndex(m => m.message === cfg.message && m.minigame === cfg.minigame);
+            const minigameSelect = document.createElement('select');
+            minigameSelect.style.cssText = 'width:100%;';
+            MINIGAME_COMPLETIONS.forEach((m, i) => {
+                const opt = document.createElement('option');
+                opt.value = String(i);
+                opt.textContent = m.minigame;
+                minigameSelect.appendChild(opt);
+            });
+            const customOpt = document.createElement('option');
+            customOpt.value = 'custom';
+            customOpt.textContent = 'Custom (enter manually)';
+            minigameSelect.appendChild(customOpt);
+            minigameSelect.value = matchIdx >= 0 ? String(matchIdx) : 'custom';
+            container.appendChild(makeLabeledRow('Minigame', minigameSelect));
+
+            const customFieldsContainer = document.createElement('div');
+            container.appendChild(customFieldsContainer);
+
+            function renderMinigameCustomFields() {
+                customFieldsContainer.innerHTML = '';
+                if (minigameSelect.value === 'custom') {
+                    customFieldsContainer.appendChild(makeLabeledRow('Chat message match',
+                        makeTextField(cfg.message || '', 'substring of the chat message', v => cfg.message = v)));
+                    customFieldsContainer.appendChild(makeLabeledRow('Minigame label (optional)',
+                        makeTextField(cfg.minigame || '', 'defaults to the message', v => cfg.minigame = v)));
+                } else {
+                    const chosen = MINIGAME_COMPLETIONS[parseInt(minigameSelect.value, 10)];
+                    cfg.minigame = chosen.minigame;
+                    cfg.message = chosen.message;
+                }
+            }
+            minigameSelect.addEventListener('change', renderMinigameCustomFields);
+            renderMinigameCustomFields();
+
             container.appendChild(makeLabeledRow('Target (completions)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
         } else if (type === 'gp_value') {
             container.appendChild(makeLabeledRow('Target (gp)', makeNumberField(cfg.target || 100000, v => cfg.target = v)));

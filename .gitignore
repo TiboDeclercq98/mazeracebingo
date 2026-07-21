@@ -2,3 +2,6 @@ Save files/
 node_modules/
 discord-bot/.env
 Remarks.txt
+runelite-plugin/build/
+runelite-plugin/.gradle/
+.idea/

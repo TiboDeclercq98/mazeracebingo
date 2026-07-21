@@ -156,6 +156,16 @@ class TileInfoPanel extends JPanel {
                 taskLine = eachMode
                     ? String.format("Receive each: %s — %,d / %,d", itemLabel, data.currentProgress, data.target)
                     : String.format("Receive %s — %,d / %,d", itemLabel, data.currentProgress, data.target);
+            } else if ("npc_damage".equals(data.taskType)) {
+                String npcLabel = buildListLabel(cfg, "npcs", "npc", eachMode);
+                taskLine = eachMode
+                    ? String.format("Deal damage to each: %s — %,d / %,d damage", npcLabel, data.currentProgress, data.target)
+                    : String.format("Deal damage to %s — %,d / %,d damage", npcLabel, data.currentProgress, data.target);
+            } else if ("clue_completion".equals(data.taskType)) {
+                String tierLabel = buildListLabel(cfg, "tiers", "tier", eachMode);
+                taskLine = eachMode
+                    ? String.format("Complete each: %s clue(s) — %,d / %,d", tierLabel, data.currentProgress, data.target)
+                    : String.format("Complete %s clue(s) — %,d / %,d", tierLabel, data.currentProgress, data.target);
             } else if ("agility_lap".equals(data.taskType)) {
                 String courseLabel = buildListLabel(cfg, "courses", "course", eachMode);
                 taskLine = eachMode
@@ -179,6 +189,8 @@ class TileInfoPanel extends JPanel {
         progressBar.setValue(pct);
         progressBar.setString("xp_gain".equals(data.taskType)
             ? String.format("%,d / %,d xp", data.currentProgress, data.target)
+            : "npc_damage".equals(data.taskType)
+            ? String.format("%,d / %,d damage", data.currentProgress, data.target)
             : "gp_value".equals(data.taskType)
             ? String.format("%,d / %,d gp", data.currentProgress, data.target)
             : String.format("%,d / %,d", data.currentProgress, data.target));

@@ -58,21 +58,31 @@ public class MazeApiClient {
         }
 
         RequestBody requestBody = RequestBody.create(JSON_MEDIA_TYPE, gson.toJson(body));
-        Request request = new Request.Builder().url(url).post(requestBody).build();
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (response.body() == null) {
-                log.warn("Progress POST for tile {} returned {} with no body", tileId, response.code());
+
+        // A 5xx is treated as transient and retried once so a brief server-side hiccup
+        // doesn't silently drop this contribution (there's no other retry path for it).
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            Request request = new Request.Builder().url(url).post(requestBody).build();
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (response.code() >= 500 && attempt == 1) {
+                    log.warn("Progress POST for tile {} returned {}, retrying once", tileId, response.code());
+                    continue;
+                }
+                if (response.body() == null) {
+                    log.warn("Progress POST for tile {} returned {} with no body", tileId, response.code());
+                    return null;
+                }
+                ProgressResponse result = gson.fromJson(response.body().charStream(), ProgressResponse.class);
+                if (!response.isSuccessful()) {
+                    log.warn("Progress POST for tile {} returned {}", tileId, response.code());
+                }
+                return result;
+            } catch (Exception e) {
+                log.warn("Failed to post progress for tile {}", tileId, e);
                 return null;
             }
-            ProgressResponse result = gson.fromJson(response.body().charStream(), ProgressResponse.class);
-            if (!response.isSuccessful()) {
-                log.warn("Progress POST for tile {} returned {}", tileId, response.code());
-            }
-            return result;
-        } catch (Exception e) {
-            log.warn("Failed to post progress for tile {}", tileId, e);
-            return null;
         }
+        return null;
     }
 
     public String fetchStateVersion(String apiUrl, String team) {

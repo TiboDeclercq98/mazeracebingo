@@ -374,6 +374,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `Receive each: <b>${itemLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`
                 : `Receive <b>${itemLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`;
         }
+        if (data.taskType === 'npc_damage') {
+            const npcLabel = buildListLabel(cfg, 'npcs', 'npc', eachMode);
+            return eachMode
+                ? `Deal damage to each: <b>${npcLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()} damage`
+                : `Deal damage to <b>${npcLabel}</b> — ${cur.toLocaleString()} / ${tgt.toLocaleString()} damage`;
+        }
+        if (data.taskType === 'clue_completion') {
+            const tierLabel = buildListLabel(cfg, 'tiers', 'tier', eachMode);
+            return eachMode
+                ? `Complete each: <b>${tierLabel}</b> clue(s) — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`
+                : `Complete <b>${tierLabel}</b> clue(s) — ${cur.toLocaleString()} / ${tgt.toLocaleString()}`;
+        }
         if (data.taskType === 'agility_lap') {
             const courseLabel = buildListLabel(cfg, 'courses', 'course', eachMode);
             return eachMode
@@ -531,13 +543,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const TASK_TYPES = [
         { value: '', label: 'No task' },
         { value: 'npc_kill', label: 'Kill NPC(s)' },
+        { value: 'npc_damage', label: 'Deal damage to NPC(s)' },
         { value: 'xp_gain', label: 'Gain XP' },
         { value: 'item_drop', label: 'Receive item(s)' },
         { value: 'agility_lap', label: 'Agility laps' },
         { value: 'minigame_completion', label: 'Minigame completion' },
+        { value: 'clue_completion', label: 'Complete clue scroll(s)' },
         { value: 'gp_value', label: 'GP value' }
     ];
-    const EACH_MODE_TYPES = ['npc_kill', 'xp_gain', 'item_drop', 'agility_lap'];
+    const EACH_MODE_TYPES = ['npc_kill', 'npc_damage', 'xp_gain', 'item_drop', 'agility_lap', 'clue_completion'];
+    // Matches CLUE_TIER_PATTERN in MazeBingoPlugin.java — the tiers the plugin can detect
+    // from the "You have completed X <tier> Treasure Trails" chat message.
+    const CLUE_TIERS = ['Beginner', 'Easy', 'Medium', 'Hard', 'Elite', 'Master'];
     const OSRS_SKILLS = [
         'Attack', 'Defence', 'Strength', 'Hitpoints', 'Ranged', 'Prayer', 'Magic',
         'Cooking', 'Woodcutting', 'Fletching', 'Fishing', 'Firemaking', 'Crafting',
@@ -897,11 +914,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 makeTextField(getListFieldValue(cfg, 'items', 'item').join(', '), 'e.g. Rune scimitar, Dragon bones',
                     v => setListField(cfg, 'items', 'item', v.split(',')))));
             container.appendChild(makeLabeledRow('Target (count)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
+        } else if (type === 'npc_damage') {
+            container.appendChild(makeLabeledRow('NPC name(s), comma-separated',
+                makeTextField(getListFieldValue(cfg, 'npcs', 'npc').join(', '), 'e.g. Vorkath, Zulrah',
+                    v => setListField(cfg, 'npcs', 'npc', v.split(',')))));
+            container.appendChild(makeLabeledRow('Target (damage)', makeNumberField(cfg.target || 10000, v => cfg.target = v)));
         } else if (type === 'agility_lap') {
             container.appendChild(makeLabeledRow('Course(s)',
                 makeMultiSelect(AGILITY_COURSES, getListFieldValue(cfg, 'courses', 'course'),
                     v => setListField(cfg, 'courses', 'course', v))));
             container.appendChild(makeLabeledRow('Target (laps)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
+        } else if (type === 'clue_completion') {
+            container.appendChild(makeLabeledRow('Tier(s)',
+                makeMultiSelect(CLUE_TIERS, getListFieldValue(cfg, 'tiers', 'tier'),
+                    v => setListField(cfg, 'tiers', 'tier', v))));
+            container.appendChild(makeLabeledRow('Target (completions)', makeNumberField(cfg.target || 1, v => cfg.target = v)));
         } else if (type === 'minigame_completion') {
             // Matched by message alone — it's the field that actually drives chat matching;
             // "minigame" is just a display label, so a differing label shouldn't force Custom.

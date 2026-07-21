@@ -35,6 +35,19 @@ function dbQuery(sql, params) {
   return db.query(sql, params).then(r => r.rows);
 }
 
+// Serializes per-team read-modify-write operations. saveMazeToDb() deletes and
+// re-inserts a team's full row set in one transaction; without this, two
+// concurrent progress submissions for the same team could interleave and one's
+// INSERT would collide with rows the other just committed (duplicate key on
+// tiles_pkey).
+const teamLocks = new Map();
+function withTeamLock(team, fn) {
+  const prior = teamLocks.get(team) || Promise.resolve();
+  const run = prior.then(fn, fn);
+  teamLocks.set(team, run.catch(() => {}));
+  return run;
+}
+
 function batchInsertQuery(table, columns, rows) {
   const colCount = columns.length;
   const placeholders = rows.map((_, ri) =>
@@ -344,17 +357,23 @@ async function saveTaskDefinitions(team, taskDefinitions) {
 
 // Returns the ordered list of named entries for a task that uses "mode": "each".
 function getEachModeItems(taskType, taskConfig) {
-  if (taskType === 'npc_kill')    return taskConfig.npcs    || (taskConfig.npc    ? [taskConfig.npc]    : []);
-  if (taskType === 'xp_gain')     return taskConfig.skills  || (taskConfig.skill  ? [taskConfig.skill]  : []);
-  if (taskType === 'item_drop')   return taskConfig.items   || (taskConfig.item   ? [taskConfig.item]   : []);
-  if (taskType === 'agility_lap') return taskConfig.courses || (taskConfig.course ? [taskConfig.course] : []);
+  if (taskType === 'npc_kill')        return taskConfig.npcs    || (taskConfig.npc    ? [taskConfig.npc]    : []);
+  if (taskType === 'npc_damage')      return taskConfig.npcs    || (taskConfig.npc    ? [taskConfig.npc]    : []);
+  if (taskType === 'xp_gain')         return taskConfig.skills  || (taskConfig.skill  ? [taskConfig.skill]  : []);
+  if (taskType === 'item_drop')       return taskConfig.items   || (taskConfig.item   ? [taskConfig.item]   : []);
+  if (taskType === 'agility_lap')     return taskConfig.courses || (taskConfig.course ? [taskConfig.course] : []);
+  if (taskType === 'clue_completion') return taskConfig.tiers   || (taskConfig.tier   ? [taskConfig.tier]   : []);
   return [];
 }
 
 // Validates tile access, records a progress contribution, updates tile state, and fires special events.
 // Returns { success, tile, specialEvent, progress, target, completed } on success,
 // or { error, status } / { success: false, alreadyCompleted, tile, status } on failure.
-async function submitTileProgress(team, id, playerName, amount, subCategory = null) {
+function submitTileProgress(team, id, playerName, amount, subCategory = null) {
+  return withTeamLock(team, () => submitTileProgressLocked(team, id, playerName, amount, subCategory));
+}
+
+async function submitTileProgressLocked(team, id, playerName, amount, subCategory = null) {
   let { mazeState, mazeWalls, boobytrapPositions, tileDescriptions, taskDefinitions } = await loadMazeFromDb(team);
   const startId = (SIZE - 1) * SIZE + Math.floor(SIZE / 2) + 1;
   const endId   = Math.floor(SIZE / 2) + 1;

@@ -279,7 +279,7 @@ public class MazeBingoPlugin extends Plugin {
         return courseName.toLowerCase().contains(cfg.get("course").getAsString().toLowerCase());
     }
 
-    // --- NPC kills ---
+    // --- NPC kills & damage ---
 
     @Subscribe
     public void onHitsplatApplied(HitsplatApplied event) {
@@ -287,6 +287,25 @@ public class MazeBingoPlugin extends Plugin {
         if (!event.getHitsplat().isMine()) return;
         NPC npc = (NPC) event.getActor();
         attackedNpcs.put(npc.getIndex(), npc);
+
+        int dmg = event.getHitsplat().getAmount();
+        String npcName = npc.getName();
+        if (dmg > 0 && npcName != null) {
+            List<ActiveTile> matches = matchingTiles("npc_damage", cfg -> npcMatches(cfg, npcName));
+            for (ActiveTile tile : matches) {
+                submitProgress(tile, dmg, npcName);
+            }
+        }
+    }
+
+    private static boolean npcMatches(JsonObject cfg, String npcName) {
+        if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
+            for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
+                if (npcName.equalsIgnoreCase(el.getAsString())) return true;
+            }
+            return false;
+        }
+        return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
     }
 
     @Subscribe
@@ -304,29 +323,13 @@ public class MazeBingoPlugin extends Plugin {
             String npcName = npc.getName();
             if (npcName == null) continue;
             log.info("Kill detected: npcName='{}'", npcName);
-            List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> {
-                if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
-                    for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
-                        if (npcName.equalsIgnoreCase(el.getAsString())) return true;
-                    }
-                    return false;
-                }
-                return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
-            });
+            List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> npcMatches(cfg, npcName));
             log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
             if (matches.isEmpty()) {
                 // Tile may have just been revealed but not yet loaded — refresh and retry once
                 executor.execute(() -> {
                     refreshMazeState();
-                    List<ActiveTile> retry = matchingTiles("npc_kill", cfg -> {
-                        if (cfg.has("npcs") && cfg.get("npcs").isJsonArray()) {
-                            for (com.google.gson.JsonElement el : cfg.getAsJsonArray("npcs")) {
-                                if (npcName.equalsIgnoreCase(el.getAsString())) return true;
-                            }
-                            return false;
-                        }
-                        return cfg.has("npc") && npcName.equalsIgnoreCase(cfg.get("npc").getAsString());
-                    });
+                    List<ActiveTile> retry = matchingTiles("npc_kill", cfg -> npcMatches(cfg, npcName));
                     log.info("Retry matched {} tile(s) for npc_kill '{}'", retry.size(), npcName);
                     for (ActiveTile tile : retry) {
                         submitProgress(tile, 1, npcName);
@@ -345,7 +348,11 @@ public class MazeBingoPlugin extends Plugin {
         attackedNpcs.remove(event.getNpc().getIndex());
     }
 
-    // --- Agility laps & minigame completions ---
+    // --- Agility laps, minigame completions & clue scrolls ---
+
+    // Matches the OSRS reward casket message, e.g. "You have completed 87 hard Treasure Trails."
+    private static final java.util.regex.Pattern CLUE_TIER_PATTERN =
+        java.util.regex.Pattern.compile("completed [\\d,]+ (\\w+) treasure trails?", java.util.regex.Pattern.CASE_INSENSITIVE);
 
     @Subscribe
     public void onChatMessage(ChatMessage event) {
@@ -363,6 +370,25 @@ public class MazeBingoPlugin extends Plugin {
                 ? tile.taskConfig.get("minigame").getAsString() : null;
             submitProgress(tile, 1, minigameName);
         }
+
+        java.util.regex.Matcher clueMatcher = CLUE_TIER_PATTERN.matcher(msg);
+        if (clueMatcher.find()) {
+            String tier = clueMatcher.group(1);
+            List<ActiveTile> clueMatches = matchingTiles("clue_completion", cfg -> tierMatches(cfg, tier));
+            for (ActiveTile tile : clueMatches) {
+                submitProgress(tile, 1, tier);
+            }
+        }
+    }
+
+    private static boolean tierMatches(JsonObject cfg, String tier) {
+        if (cfg.has("tiers") && cfg.get("tiers").isJsonArray()) {
+            for (com.google.gson.JsonElement el : cfg.getAsJsonArray("tiers")) {
+                if (tier.equalsIgnoreCase(el.getAsString())) return true;
+            }
+            return false;
+        }
+        return cfg.has("tier") && tier.equalsIgnoreCase(cfg.get("tier").getAsString());
     }
 
     // --- Item drops / chest loot ---
@@ -457,8 +483,10 @@ public class MazeBingoPlugin extends Plugin {
 
             String suffix = "xp_gain".equals(tile.taskType) ? " xp"
                 : "npc_kill".equals(tile.taskType) ? (amount == 1 ? " kill" : " kills")
+                : "npc_damage".equals(tile.taskType) ? " damage"
                 : "agility_lap".equals(tile.taskType) ? " lap"
                 : "minigame_completion".equals(tile.taskType) ? " completion"
+                : "clue_completion".equals(tile.taskType) ? (amount == 1 ? " clue" : " clues")
                 : "";
             String contrib = amount + (subCategory != null ? " " + subCategory : "") + suffix;
             if (response.contributed && contributionMessageEnabled(tile.taskType)) {
@@ -517,8 +545,10 @@ public class MazeBingoPlugin extends Plugin {
         switch (taskType) {
             case "xp_gain": return config.chatContributionXp();
             case "npc_kill": return config.chatContributionNpcKill();
+            case "npc_damage": return config.chatContributionNpcDamage();
             case "agility_lap": return config.chatContributionAgilityLap();
             case "minigame_completion": return config.chatContributionMinigame();
+            case "clue_completion": return config.chatContributionClueCompletion();
             case "item_drop": return config.chatContributionItemDrop();
             case "gp_value": return config.chatContributionGpValue();
             default: return true;

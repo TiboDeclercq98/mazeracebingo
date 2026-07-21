@@ -151,11 +151,33 @@ public interface MazeBingoConfig extends Config {
     }
 
     @ConfigItem(
+        keyName = "chatContributionNpcDamage",
+        name = "NPC damage contributions",
+        description = "Show \"You contributed...\" chat messages for NPC damage tiles",
+        section = "chatMessages",
+        position = 14
+    )
+    default boolean chatContributionNpcDamage() {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "chatContributionClueCompletion",
+        name = "Clue completion contributions",
+        description = "Show \"You contributed...\" chat messages for clue scroll completion tiles",
+        section = "chatMessages",
+        position = 15
+    )
+    default boolean chatContributionClueCompletion() {
+        return true;
+    }
+
+    @ConfigItem(
         keyName = "chatErrorMessages",
         name = "Error messages",
         description = "Show error messages in chat when a progress submission fails",
         section = "chatMessages",
-        position = 14
+        position = 16
     )
     default boolean chatErrorMessages() {
         return true;
@@ -166,7 +188,7 @@ public interface MazeBingoConfig extends Config {
         name = "Tile completion messages",
         description = "Show a chat message when you complete a tile",
         section = "chatMessages",
-        position = 15
+        position = 17
     )
     default boolean chatCompletionMessages() {
         return true;
@@ -177,7 +199,7 @@ public interface MazeBingoConfig extends Config {
         name = "Special event messages",
         description = "Show special event chat messages (e.g. game over, bonus events)",
         section = "chatMessages",
-        position = 16
+        position = 18
     )
     default boolean chatSpecialEventMessages() {
         return true;

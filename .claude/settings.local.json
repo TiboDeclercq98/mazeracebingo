@@ -131,7 +131,11 @@
       "Bash(taskkill //F //PID 2540)",
       "Bash(git log *)",
       "Bash(node -e \"require.resolve\\('jsdom'\\)\")",
-      "Bash(timeout 60 npx playwright install chromium)"
+      "Bash(timeout 60 npx playwright install chromium)",
+      "WebSearch",
+      "PowerShell(java -version)",
+      "PowerShell(node --version 2>$null)",
+      "Bash(node --check maze-api.js)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

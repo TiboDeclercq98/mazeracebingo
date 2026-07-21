@@ -22,7 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
             fogOff = !fogOff;
             fogBtn.textContent = fogOff ? 'Fog: Off' : 'Fog';
             fogBtn.classList.toggle('active', fogOff);
-            if (lastState) renderMazeFromAPI();
+            // Re-render immediately from the cached state instead of waiting on a fetch,
+            // so the grid, Overview panel, and Tasks modal all reflect the toggle at once.
+            if (lastState) renderFromState(lastState);
         });
     }
 
@@ -150,18 +152,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return revealed;
     }
 
+    // The set actually used for display: identical to the true reveal set, except when
+    // Fog is off, in which case every tile is treated as revealed across the grid, the
+    // Overview panel, and the Tasks modal. Fog still never touches the real game state.
+    function computeDisplayRevealedSet(state) {
+        if (fogOff) return new Set(state.tiles.map((_, i) => i));
+        return computeRevealedSet(state);
+    }
+
     async function renderMazeFromAPI() {
         const state = await fetchMazeState();
         if (!state) return; // API unavailable — skip this render cycle, next poll will retry
+        renderFromState(state);
+    }
+
+    // Renders the grid/Overview panel/events feed from an already-fetched state, without
+    // hitting the network. Used by the poll loop and by the Fog toggle (for instant feedback).
+    function renderFromState(state) {
         grid.innerHTML = '';
         tiles = [];
         const startIdx = (state.size - 1) * state.size + Math.floor(state.size / 2);
         const endIdx = Math.floor(state.size / 2);
 
-        const revealed = computeRevealedSet(state);
-        // Fog toggle only affects what's drawn — it never changes what's actually
-        // "revealed" for the Overview/Tasks panels or for the real game logic.
-        const displayRevealed = fogOff ? new Set(state.tiles.map((_, i) => i)) : revealed;
+        const revealed = computeDisplayRevealedSet(state);
         lastState = state;
         lastRevealed = revealed;
 
@@ -221,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 // --- END DEAD-END DETECTION ---
-            } else if (displayRevealed.has(i)) {
+            } else if (revealed.has(i)) {
                 tile.classList.add('revealed');
                 tile.dataset.visible = 'true';
                 tile.style.background = '';
@@ -451,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tasksList.innerHTML = '<em>Failed to load tasks.</em>';
             return;
         }
-        const revealed = (lastState === state && lastRevealed) ? lastRevealed : computeRevealedSet(state);
+        const revealed = (lastState === state && lastRevealed) ? lastRevealed : computeDisplayRevealedSet(state);
         const startIdx = (state.size - 1) * state.size + Math.floor(state.size / 2);
         const endIdx = Math.floor(state.size / 2);
         const tileDescs = state.tileDescriptions || {};

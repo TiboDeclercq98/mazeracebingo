@@ -128,7 +128,10 @@
       "Bash(kill %1)",
       "Bash(taskkill //F //IM node.exe //FI \"WINDOWTITLE eq *\")",
       "Bash(netstat -ano)",
-      "Bash(taskkill //F //PID 2540)"
+      "Bash(taskkill //F //PID 2540)",
+      "Bash(git log *)",
+      "Bash(node -e \"require.resolve\\('jsdom'\\)\")",
+      "Bash(timeout 60 npx playwright install chromium)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

@@ -88,6 +88,18 @@ body {
     background: #1976d2;
 }
 
+#fog-btn.active {
+    background: #ff9800;
+}
+
+#fog-btn.active:hover {
+    background: #fb8c00;
+}
+
+#tasks-list li[data-tileid]:hover {
+    background: #f5f5f5;
+}
+
 .save-btn {
     display: block;
     margin-top: 16px;

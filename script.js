@@ -3,10 +3,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_BASE = 'https://mazeracebingo.onrender.com';
     let tiles = [];
 
+    // Cache of the most recent server state/reveal-set, shared by the Tasks modal so it
+    // doesn't need its own network round trip when the poll loop already has fresh data.
+    let lastState = null;
+    let lastRevealed = null;
+
     // --- TEAM PARAMETER SUPPORT ---
     function getTeamFromUrl() {
         const params = new URLSearchParams(window.location.search);
         return params.get('team') || 'default';
+    }
+
+    // --- FOG OF WAR TOGGLE (view-only — never touches the real game state) ---
+    let fogOff = false;
+    const fogBtn = document.getElementById('fog-btn');
+    if (fogBtn) {
+        fogBtn.addEventListener('click', () => {
+            fogOff = !fogOff;
+            fogBtn.textContent = fogOff ? 'Fog: Off' : 'Fog';
+            fogBtn.classList.toggle('active', fogOff);
+            if (lastState) renderMazeFromAPI();
+        });
     }
 
     // --- CONNECTION STATUS (mirrors the RuneLite plugin's status label) ---
@@ -62,29 +79,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return adj;
     }
 
-    async function renderMazeFromAPI() {
-        const state = await fetchMazeState();
-        if (!state) return; // API unavailable — skip this render cycle, next poll will retry
-        grid.innerHTML = '';
-        tiles = [];
+    // Computes the set of tile indices actually revealed by real game progress
+    // (START tile, completed tiles, and their unwalled neighbours). This is the
+    // "true" reveal set — independent of the client-only Fog toggle.
+    function computeRevealedSet(state) {
         const revealed = new Set();
         const completed = new Set();
         state.tiles.forEach((t, i) => { if (t.completed) completed.add(i); });
         const startIdx = (state.size - 1) * state.size + Math.floor(state.size / 2);
-        const endIdx = Math.floor(state.size / 2);
-        // Reveal START always; END is revealed only when a completed neighbour uncovers it
         revealed.add(startIdx);
-        // Game over: reveal the entire maze
         if (state.gameOver) {
             state.tiles.forEach((_, i) => revealed.add(i));
+            return revealed;
         }
-        // Helper to get wall object
         function getWallObj(idx) {
             const row = Math.floor(idx / state.size);
             const col = idx % state.size;
             return state.walls.find(w => w.row === row && w.col === col);
         }
-        // Reveal adjacent to completed, only if no wall between
         completed.forEach(idx => {
             revealed.add(idx);
             const row = Math.floor(idx / state.size);
@@ -135,6 +147,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+        return revealed;
+    }
+
+    async function renderMazeFromAPI() {
+        const state = await fetchMazeState();
+        if (!state) return; // API unavailable — skip this render cycle, next poll will retry
+        grid.innerHTML = '';
+        tiles = [];
+        const startIdx = (state.size - 1) * state.size + Math.floor(state.size / 2);
+        const endIdx = Math.floor(state.size / 2);
+
+        const revealed = computeRevealedSet(state);
+        // Fog toggle only affects what's drawn — it never changes what's actually
+        // "revealed" for the Overview/Tasks panels or for the real game logic.
+        const displayRevealed = fogOff ? new Set(state.tiles.map((_, i) => i)) : revealed;
+        lastState = state;
+        lastRevealed = revealed;
+
         for (let i = 0; i < state.tiles.length; i++) {
             const tileData = state.tiles[i];
             const row = Math.floor(i / state.size);
@@ -191,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 // --- END DEAD-END DETECTION ---
-            } else if (revealed.has(i)) {
+            } else if (displayRevealed.has(i)) {
                 tile.classList.add('revealed');
                 tile.dataset.visible = 'true';
                 tile.style.background = '';
@@ -211,16 +241,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 tile.dataset.visible = 'false';
                 tile.classList.remove('wall-top', 'wall-right', 'wall-bottom', 'wall-left');
             }
-            // Boobytrap: only show if completed
-            if (state.boobytraps && state.boobytraps.some(b => b.row === row && b.col === col) && tileData.completed) {
+            // Boobytrap: shown once completed, or always when Fog is off (view-only preview)
+            if (state.boobytraps && state.boobytraps.some(b => b.row === row && b.col === col) && (tileData.completed || fogOff)) {
                 tile.classList.add('boobytrap');
             } else {
                 tile.classList.remove('boobytrap');
             }
             // Always remove wall classes first
             tile.classList.remove('wall-top', 'wall-right', 'wall-bottom', 'wall-left');
-            // Walls: only show if completed or START/END
-            if (tileData.completed || i === startIdx || i === endIdx) {
+            // Walls: shown once completed, for START/END, or always when Fog is off
+            if (tileData.completed || i === startIdx || i === endIdx || fogOff) {
                 const wallObj = state.walls.find(w => w.row === row && w.col === col);
                 if (wallObj) {
                     if (wallObj.walls.top) tile.classList.add('wall-top');
@@ -409,35 +439,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeTasksModal = document.getElementById('close-tasks-modal');
     const tasksList = document.getElementById('tasks-list');
 
+    // Shows a detailed, read-only breakdown of every currently visible (revealed,
+    // uncompleted) task — mirrors the RuneLite plugin's "Active Tasks" panel, but
+    // with the full task-line detail from the progress modal. Clicking a row opens
+    // that tile's full progress modal (contributions, each-mode breakdown, etc.).
     tasksBtn.addEventListener('click', async () => {
         tasksModal.style.display = 'block';
         tasksList.innerHTML = '<em>Loading...</em>';
-        try {
-            // Fetch maze state to get all tile ids and descriptions
-            const state = await fetchMazeState();
-            const startIdx = (state.size - 1) * state.size + Math.floor(state.size / 2);
-            const endIdx = Math.floor(state.size / 2);
-            const tileDescs = state.tileDescriptions || {};
-            let html = '<ul style="list-style:none;padding-left:0">';
-            state.tiles.forEach((t, idx) => {
-                if (idx === startIdx || idx === endIdx) return;
-                const desc = tileDescs[t.id] || '';
-                html += `<li style='margin-bottom:8px;'>Tile ${t.id}: <input type='text' data-tileid='${t.id}' value="${desc}" style='width:220px;'/></li>`;
-            });
-            html += '</ul>';
-            tasksList.innerHTML = html;
-            // Add input listeners to save changes (for now, still localStorage, but ready for API)
-            tasksList.querySelectorAll('input[data-tileid]').forEach(input => {
-                input.addEventListener('input', (e) => {
-                    // For now, just update localStorage (API update can be added if backend supports it)
-                    tileDescs[input.dataset.tileid] = input.value;
-                    // Optionally, send to backend here
-                    // localStorage.setItem('tileDescs', JSON.stringify(tileDescs));
-                });
-            });
-        } catch (e) {
-            tasksList.innerHTML = '<em>Failed to load tile descriptions.</em>';
+        const state = lastState || await fetchMazeState();
+        if (!state) {
+            tasksList.innerHTML = '<em>Failed to load tasks.</em>';
+            return;
         }
+        const revealed = (lastState === state && lastRevealed) ? lastRevealed : computeRevealedSet(state);
+        const startIdx = (state.size - 1) * state.size + Math.floor(state.size / 2);
+        const endIdx = Math.floor(state.size / 2);
+        const tileDescs = state.tileDescriptions || {};
+
+        const visibleTasks = [];
+        state.tiles.forEach((t, idx) => {
+            if (idx === startIdx || idx === endIdx) return;
+            if (t.completed || !revealed.has(idx)) return;
+            visibleTasks.push(t);
+        });
+
+        if (!visibleTasks.length) {
+            tasksList.innerHTML = '<em>No visible tasks right now.</em>';
+            return;
+        }
+
+        tasksList.innerHTML = '<ul style="list-style:none;padding-left:0;margin-top:12px;">' +
+            visibleTasks.map(t => {
+                const desc = tileDescs[t.id] || '';
+                const target = t.completionsRequired || 1;
+                const current = t.currentProgress ?? t.completionsDone ?? 0;
+                const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+                const taskLine = buildTaskLine({ taskType: t.taskType, taskConfig: t.taskConfig, currentProgress: current, target });
+                return `
+                    <li data-tileid="${t.id}" style="margin-bottom:12px;cursor:pointer;padding:6px;border-radius:4px;border:1px solid #e0e0e0;">
+                        <div style="font-weight:bold;margin-bottom:2px;">Tile ${t.id}${desc ? ': ' + escapeHtml(desc) : ''}</div>
+                        <div style="font-size:0.9em;margin-bottom:4px;">${taskLine}</div>
+                        <div style="background:#ddd;border-radius:4px;height:10px;">
+                            <div style="background:#4caf50;width:${pct}%;height:100%;border-radius:4px;"></div>
+                        </div>
+                    </li>`;
+            }).join('') + '</ul>';
+
+        tasksList.querySelectorAll('li[data-tileid]').forEach(li => {
+            li.addEventListener('click', () => {
+                const t = state.tiles.find(x => x.id === parseInt(li.dataset.tileid, 10));
+                if (t) openProgressModal(t, state);
+            });
+        });
     });
     closeTasksModal.addEventListener('click', () => {
         tasksModal.style.display = 'none';
@@ -448,6 +501,279 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     // --- END TASK LIST MODAL ---
+
+    // --- DRAW MODE (maze layout editor — builds save files consumed by POST /api/create) ---
+    // Restored from the pre-API version of this app (commit 7a50d1f); adapted to write
+    // save-file JSON instead of localStorage, since the live app is now server-backed.
+    const DRAW_SIZE = 9; // matches the SIZE constant in maze-api.js
+    const drawPopupBtn = document.getElementById('draw-popup-btn');
+    const drawModal = document.getElementById('draw-modal');
+    const closeDrawModal = document.getElementById('close-draw-modal');
+    const drawGrid = document.getElementById('draw-grid');
+
+    let drawTiles = [];
+    let drawSelected = null;
+    let drawInitialized = false;
+    let drawTileDescriptions = {};
+    let drawTrapDescriptions = {};
+
+    function drawStartCoord() { return { row: DRAW_SIZE - 1, col: Math.floor(DRAW_SIZE / 2) }; }
+    function drawEndCoord()   { return { row: 0, col: Math.floor(DRAW_SIZE / 2) }; }
+
+    // Builds a fresh grid where every tile is walled off on all 4 sides — the blank
+    // canvas the designer carves paths into by clicking pairs of adjacent tiles.
+    function buildBlankDrawGrid() {
+        drawGrid.innerHTML = '';
+        drawTiles = [];
+        drawSelected = null;
+        const start = drawStartCoord(), end = drawEndCoord();
+        for (let row = 0; row < DRAW_SIZE; row++) {
+            for (let col = 0; col < DRAW_SIZE; col++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile revealed wall-top wall-right wall-bottom wall-left';
+                tile.dataset.row = row;
+                tile.dataset.col = col;
+                if (row === start.row && col === start.col) {
+                    tile.textContent = 'START';
+                    tile.style.background = 'pink';
+                    tile.style.color = '#000';
+                } else if (row === end.row && col === end.col) {
+                    tile.textContent = 'END';
+                    tile.style.background = '#e53935';
+                    tile.style.color = '#fff';
+                } else {
+                    tile.textContent = row * DRAW_SIZE + col + 1;
+                }
+                tile.onclick = () => handleDrawTileClick(tile, row, col);
+                tile.oncontextmenu = e => handleDrawTileRightClick(e, tile);
+                drawTiles.push(tile);
+                drawGrid.appendChild(tile);
+            }
+        }
+    }
+
+    // Click two adjacent tiles in sequence to toggle the shared wall between them.
+    function handleDrawTileClick(tile, row, col) {
+        if (drawSelected === null) {
+            drawSelected = { tile, row, col };
+            tile.style.outline = '2px solid orange';
+            return;
+        }
+        drawSelected.tile.style.outline = '';
+        const dr = row - drawSelected.row;
+        const dc = col - drawSelected.col;
+        let wall1, wall2;
+        if (dr === 1 && dc === 0)       { wall1 = 'bottom'; wall2 = 'top'; }
+        else if (dr === -1 && dc === 0) { wall1 = 'top';    wall2 = 'bottom'; }
+        else if (dr === 0 && dc === 1)  { wall1 = 'right';  wall2 = 'left'; }
+        else if (dr === 0 && dc === -1) { wall1 = 'left';   wall2 = 'right'; }
+        if (wall1 && wall2) {
+            const hasWall1 = drawSelected.tile.classList.contains('wall-' + wall1);
+            const hasWall2 = tile.classList.contains('wall-' + wall2);
+            if (hasWall1 && hasWall2) {
+                drawSelected.tile.classList.remove('wall-' + wall1);
+                tile.classList.remove('wall-' + wall2);
+            } else {
+                drawSelected.tile.classList.add('wall-' + wall1);
+                tile.classList.add('wall-' + wall2);
+            }
+        }
+        drawSelected = null;
+    }
+
+    // Right-click toggles a boobytrap (key) on a tile.
+    function handleDrawTileRightClick(e, tile) {
+        e.preventDefault();
+        tile.classList.toggle('boobytrap');
+        const drawTrapsModal = document.getElementById('draw-traps-modal');
+        if (drawTrapsModal && drawTrapsModal.style.display === 'block') {
+            renderDrawTrapsList();
+        }
+    }
+
+    function openDrawModal() {
+        if (!drawInitialized) {
+            buildBlankDrawGrid();
+            drawTileDescriptions = {};
+            drawTrapDescriptions = {};
+            drawInitialized = true;
+        }
+        drawModal.style.display = 'block';
+    }
+
+    if (drawPopupBtn) drawPopupBtn.onclick = openDrawModal;
+    if (closeDrawModal) closeDrawModal.onclick = () => { drawModal.style.display = 'none'; };
+    window.addEventListener('click', event => {
+        if (event.target === drawModal) drawModal.style.display = 'none';
+    });
+
+    function downloadJson(obj, filename) {
+        const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    }
+
+    // Save: download a save file shaped exactly like POST /api/create's expected body
+    // (see files in "Save files/"), ready to be posted as-is to create a live maze.
+    const drawSaveBtn = document.getElementById('draw-save-btn');
+    if (drawSaveBtn) drawSaveBtn.onclick = () => {
+        const mazeWalls = [];
+        const boobytraps = [];
+        for (const tile of drawTiles) {
+            const row = parseInt(tile.dataset.row, 10);
+            const col = parseInt(tile.dataset.col, 10);
+            mazeWalls.push({
+                row, col,
+                walls: {
+                    top: tile.classList.contains('wall-top'),
+                    right: tile.classList.contains('wall-right'),
+                    bottom: tile.classList.contains('wall-bottom'),
+                    left: tile.classList.contains('wall-left')
+                }
+            });
+            if (tile.classList.contains('boobytrap')) boobytraps.push({ row, col });
+        }
+        downloadJson({
+            saveData: {
+                size: DRAW_SIZE,
+                mazeWalls,
+                boobytraps,
+                tileDescriptions: { ...drawTileDescriptions },
+                trapDescriptions: { ...drawTrapDescriptions },
+                taskDefinitions: {}
+            }
+        }, 'maze-save.json');
+    };
+
+    // Rebuilds the draw grid from a previously saved (or hand-edited) save file.
+    // Accepts both the wrapped `{ saveData: {...} }` shape used by /api/create
+    // and a bare `{ mazeWalls, ... }` shape for backward compatibility.
+    function loadDrawState(data) {
+        buildBlankDrawGrid();
+        for (const tile of drawTiles) {
+            const row = parseInt(tile.dataset.row, 10);
+            const col = parseInt(tile.dataset.col, 10);
+            tile.classList.remove('wall-top', 'wall-right', 'wall-bottom', 'wall-left');
+            const wallObj = data.mazeWalls.find(w => w.row === row && w.col === col);
+            if (wallObj) {
+                if (wallObj.walls.top) tile.classList.add('wall-top');
+                if (wallObj.walls.right) tile.classList.add('wall-right');
+                if (wallObj.walls.bottom) tile.classList.add('wall-bottom');
+                if (wallObj.walls.left) tile.classList.add('wall-left');
+            }
+        }
+        (data.boobytraps || []).forEach(b => {
+            const tile = drawTiles.find(t => parseInt(t.dataset.row, 10) === b.row && parseInt(t.dataset.col, 10) === b.col);
+            if (tile) tile.classList.add('boobytrap');
+        });
+        drawTileDescriptions = { ...(data.tileDescriptions || {}) };
+        drawTrapDescriptions = { ...(data.trapDescriptions || {}) };
+        drawInitialized = true;
+    }
+
+    const drawLoadBtn = document.getElementById('draw-load-btn');
+    if (drawLoadBtn) drawLoadBtn.onclick = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,application/json';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = evt => {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    const data = (parsed && parsed.saveData) ? parsed.saveData : parsed;
+                    if (!data || !Array.isArray(data.mazeWalls)) {
+                        alert('Invalid maze save file.');
+                        return;
+                    }
+                    loadDrawState(data);
+                } catch (err) {
+                    alert('Failed to load maze save: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    };
+
+    // Draw Tasks modal: edit each tile's description before saving.
+    const drawTasksBtn = document.getElementById('draw-tasks-btn');
+    const drawTasksModal = document.getElementById('draw-tasks-modal');
+    const closeDrawTasksModal = document.getElementById('close-draw-tasks-modal');
+    const drawTasksList = document.getElementById('draw-tasks-list');
+
+    if (drawTasksBtn && drawTasksModal && closeDrawTasksModal) {
+        drawTasksBtn.onclick = () => {
+            const start = drawStartCoord(), end = drawEndCoord();
+            const startId = start.row * DRAW_SIZE + start.col + 1;
+            const endId = end.row * DRAW_SIZE + end.col + 1;
+            let html = '<ul style="list-style:none;padding-left:0">';
+            for (let id = 1; id <= DRAW_SIZE * DRAW_SIZE; id++) {
+                if (id === startId || id === endId) continue;
+                const desc = drawTileDescriptions[id] || '';
+                html += `<li style='margin-bottom:8px;'>Tile ${id}: <input type='text' data-tileid='${id}' value="${escapeHtml(desc)}" style='width:220px;'/></li>`;
+            }
+            html += '</ul>';
+            drawTasksList.innerHTML = html;
+            drawTasksList.querySelectorAll('input[data-tileid]').forEach(input => {
+                input.addEventListener('input', () => {
+                    drawTileDescriptions[input.dataset.tileid] = input.value;
+                });
+            });
+            drawTasksModal.style.display = 'block';
+        };
+        closeDrawTasksModal.onclick = () => { drawTasksModal.style.display = 'none'; };
+        window.addEventListener('click', event => {
+            if (event.target === drawTasksModal) drawTasksModal.style.display = 'none';
+        });
+    }
+
+    // Draw Traps modal: edit descriptions for tiles currently marked as boobytraps.
+    const drawTrapsBtn = document.getElementById('draw-traps-btn');
+    const drawTrapsModal = document.getElementById('draw-traps-modal');
+    const closeDrawTrapsModal = document.getElementById('close-draw-traps-modal');
+    const drawTrapsList = document.getElementById('draw-traps-list');
+
+    function renderDrawTrapsList() {
+        const trapTiles = drawTiles.filter(t => t.classList.contains('boobytrap'));
+        if (!trapTiles.length) {
+            drawTrapsList.innerHTML = '<em>No traps placed. Right-click a tile in the Draw grid to add one.</em>';
+            return;
+        }
+        let html = '<ul style="list-style:none;padding-left:0">';
+        trapTiles.forEach(tile => {
+            const row = parseInt(tile.dataset.row, 10), col = parseInt(tile.dataset.col, 10);
+            const id = row * DRAW_SIZE + col + 1;
+            const desc = drawTrapDescriptions[id] || '';
+            html += `<li style='margin-bottom:8px;'>Tile ${id}: <input type='text' data-tileid='${id}' value="${escapeHtml(desc)}" style='width:220px;'/></li>`;
+        });
+        html += '</ul>';
+        drawTrapsList.innerHTML = html;
+        drawTrapsList.querySelectorAll('input[data-tileid]').forEach(input => {
+            input.addEventListener('input', () => {
+                drawTrapDescriptions[input.dataset.tileid] = input.value;
+            });
+        });
+    }
+
+    if (drawTrapsBtn && drawTrapsModal && closeDrawTrapsModal) {
+        drawTrapsBtn.onclick = () => {
+            renderDrawTrapsList();
+            drawTrapsModal.style.display = 'block';
+        };
+        closeDrawTrapsModal.onclick = () => { drawTrapsModal.style.display = 'none'; };
+        window.addEventListener('click', event => {
+            if (event.target === drawTrapsModal) drawTrapsModal.style.display = 'none';
+        });
+    }
+    // --- END DRAW MODE ---
 
     // On page load, render from API
     renderMazeFromAPI();

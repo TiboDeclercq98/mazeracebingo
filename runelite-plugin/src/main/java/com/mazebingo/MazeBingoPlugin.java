@@ -457,11 +457,16 @@ public class MazeBingoPlugin extends Plugin {
         String team = config.teamName();
         if (team.isEmpty()) return;
 
-        String dedupKey = tile.id + ":" + subCategory;
-        int currentTick = client.getTickCount();
-        Integer lastTick = recentSubmits.get(dedupKey);
-        if (lastTick != null && currentTick - lastTick <= 1) return;
-        recentSubmits.put(dedupKey, currentTick);
+        // npc_damage must never be deduped: multi-hit weapons (e.g. twinflame staff) and
+        // burn/poison ticks can legitimately land several real hitsplats on the same NPC
+        // within one or two ticks, and each one carries damage that must be counted.
+        if (!"npc_damage".equals(tile.taskType)) {
+            String dedupKey = tile.id + ":" + subCategory;
+            int currentTick = client.getTickCount();
+            Integer lastTick = recentSubmits.get(dedupKey);
+            if (lastTick != null && currentTick - lastTick <= 1) return;
+            recentSubmits.put(dedupKey, currentTick);
+        }
 
         executor.execute(() -> {
             ProgressResponse response = apiClient.postProgress(apiUrl, tile.id, playerName, amount, team, subCategory);

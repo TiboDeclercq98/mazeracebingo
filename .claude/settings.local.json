@@ -135,7 +135,16 @@
       "WebSearch",
       "PowerShell(java -version)",
       "PowerShell(node --version 2>$null)",
-      "Bash(node --check maze-api.js)"
+      "Bash(node --check maze-api.js)",
+      "Bash(find / -iname \"*runelite-api*.jar\" 2>/dev/null | head -50)",
+      "Bash(mkdir -p \"/tmp/rl_extract\")",
+      "Read(//tmp/**)",
+      "Bash(unzip -o -j \"C:\\\\Users\\\\Tibo Declercq/.gradle/caches/modules-2/files-2.1/net.runelite/runelite-api/1.12.33/c57ab3d475239f6b602def23a7b0319c633e8a79/runelite-api-1.12.33-sources.jar\" \"net/runelite/api/Hitsplat.java\" \"net/runelite/api/HitsplatID.java\" \"net/runelite/api/events/HitsplatApplied.java\")",
+      "Read(//tmp/rl_extract/**)",
+      "Bash(pwd; ls *)",
+      "Bash(cat /tmp/rl_extract/Hitsplat.java)",
+      "Bash(cat /tmp/rl_extract/HitsplatID.java)",
+      "Bash(cat /tmp/rl_extract/HitsplatApplied.java)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

@@ -101,6 +101,24 @@ Sounds can be muted or have their volume adjusted in the plugin config panel. To
 
 The status indicator at the top of the panel turns green when the plugin is connected and a team name is configured.
 
+### Chat message settings
+
+Each task type has its own checkbox (under **Chat Messages** in the config panel) controlling whether "You contributed..." messages for that type are sent to your chatbox. All default to on and only affect your own chat.
+
+| Setting | Description |
+|---|---|
+| XP gain contributions | Show contribution messages for `xp_gain` tiles |
+| NPC kill contributions | Show contribution messages for `npc_kill` tiles |
+| NPC damage contributions | Show contribution messages for `npc_damage` tiles |
+| Agility lap contributions | Show contribution messages for `agility_lap` tiles |
+| Minigame completion contributions | Show contribution messages for `minigame_completion` tiles |
+| Clue completion contributions | Show contribution messages for `clue_completion` tiles |
+| Item drop contributions | Show contribution messages for `item_drop` tiles |
+| GP value contributions | Show contribution messages for `gp_value` tiles |
+| Error messages | Show an error message when a progress submission fails |
+| Tile completion messages | Show a message when you complete a tile |
+| Special event messages | Show special event messages (e.g. game over, bonus events) |
+
 ## Building locally
 
 Requires Java 11+ and Gradle.

@@ -98,6 +98,21 @@ In the RuneLite settings panel (search "Maze"):
 | API URL | `https://mazeracebingo.onrender.com` | Base URL of the API server |
 | Team Name | _(empty)_ | Your team name — must match the team used in Discord |
 
+Under **Chat Messages**, each task type has its own checkbox for whether "You contributed..." messages are sent to your chatbox (all default to on, and only affect your own chat):
+
+| Setting | Task type |
+|---|---|
+| XP gain contributions | `xp_gain` |
+| NPC kill contributions | `npc_kill` |
+| NPC damage contributions | `npc_damage` |
+| Agility lap contributions | `agility_lap` |
+| Minigame completion contributions | `minigame_completion` |
+| Clue completion contributions | `clue_completion` |
+| Item drop contributions | `item_drop` |
+| GP value contributions | `gp_value` |
+
+Plus general toggles: **Error messages**, **Tile completion messages**, and **Special event messages**.
+
 ### Tracked Event Types
 
 | Task Type | What is tracked |

@@ -129,26 +129,27 @@ public class MazeEventNotificationOverlay {
 
     /**
      * The Lore pack gives each maze tile its own numbered sound (tile N -> lore/N.wav) and uses dedicated
-     * success/fail sounds for the end tile. The end-tile fail sound also plays when the player tries to
-     * finish without all keys (a keys-missing event). Key-found events are intentionally silent. Any tile
-     * without a bundled Lore file falls back to the matching Default category sound.
+     * end-tile sounds. The backend emits exactly one "gameover" event, and only when the end tile is
+     * completed, so gameover is always the WIN. A keys-missing event (trying to finish without all keys) is
+     * the fail case. Booby-trap "key found" events are intentionally silent. Any tile without a bundled Lore
+     * file falls back to the matching Default category sound.
      */
     private void playLoreSound(MazeEventEntry event, float gainDb) {
-        String lowerMsg = event.message == null ? "" : event.message.toLowerCase();
-
         final String loreFilename;
         final MazeSound fallback;
-        if ("gameover".equals(event.type) || "keys_missing".equals(event.type)) {
-            loreFilename = "fail.wav";
-            fallback = MazeSound.FAIL;
-        } else if (lowerMsg.contains("completed the end tile")) {
+        if ("gameover".equals(event.type)) {
+            // Only emitted when the end tile is completed — the win.
             loreFilename = "success.wav";
             fallback = MazeSound.SUCCESS;
+        } else if ("keys_missing".equals(event.type)) {
+            // Tried to finish the end tile without all keys.
+            loreFilename = "fail.wav";
+            fallback = MazeSound.FAIL;
         } else if ("tile_complete".equals(event.type)) {
             loreFilename = event.tileId + ".wav";
             fallback = MazeSound.COMPLETION;
         } else {
-            // Key found: no Lore sound.
+            // Booby-trap key found: no Lore sound.
             return;
         }
 

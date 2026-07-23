@@ -20,8 +20,6 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.StatChanged;
-import net.runelite.client.chat.ChatColorType;
-import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.eventbus.Subscribe;
@@ -562,21 +560,15 @@ public class MazeBingoPlugin extends Plugin {
         }
     }
 
-    private static final Color PREFIX_COLOR = new Color(0xFF, 0x6E, 0xC7); // pink
+    // Pink [MazeRaceBingo] prefix as native chat markup. Built as a raw string (not via
+    // ChatMessageBuilder.append) because append() escapes angle brackets, which would break
+    // the <col=..> tags that callers already embed in their messages.
+    private static final String CHAT_PREFIX = "<col=ff6ec7>[MazeRaceBingo]</col> ";
 
     private void sendChatMessage(String message) {
-        String formatted = new ChatMessageBuilder()
-            .append(ChatColorType.NORMAL)
-            .append("[")
-            .append(PREFIX_COLOR, "MazeRaceBingo")
-            .append(ChatColorType.NORMAL)
-            .append("] ")
-            .append(message)
-            .build();
-
         chatMessageManager.queue(QueuedMessage.builder()
             .type(ChatMessageType.GAMEMESSAGE)
-            .runeLiteFormattedMessage(formatted)
+            .runeLiteFormattedMessage(CHAT_PREFIX + message)
             .build());
     }
 

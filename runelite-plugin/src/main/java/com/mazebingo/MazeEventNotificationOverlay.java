@@ -129,15 +129,16 @@ public class MazeEventNotificationOverlay {
 
     /**
      * The Lore pack gives each maze tile its own numbered sound (tile N -> lore/N.wav) and uses dedicated
-     * success/fail sounds for the end tile. Key-found and keys-missing events are intentionally silent.
-     * Any tile without a bundled Lore file falls back to the matching Default category sound.
+     * success/fail sounds for the end tile. The end-tile fail sound also plays when the player tries to
+     * finish without all keys (a keys-missing event). Key-found events are intentionally silent. Any tile
+     * without a bundled Lore file falls back to the matching Default category sound.
      */
     private void playLoreSound(MazeEventEntry event, float gainDb) {
         String lowerMsg = event.message == null ? "" : event.message.toLowerCase();
 
         final String loreFilename;
         final MazeSound fallback;
-        if ("gameover".equals(event.type)) {
+        if ("gameover".equals(event.type) || "keys_missing".equals(event.type)) {
             loreFilename = "fail.wav";
             fallback = MazeSound.FAIL;
         } else if (lowerMsg.contains("completed the end tile")) {
@@ -147,7 +148,7 @@ public class MazeEventNotificationOverlay {
             loreFilename = event.tileId + ".wav";
             fallback = MazeSound.COMPLETION;
         } else {
-            // Key found / keys missing: no Lore sound.
+            // Key found: no Lore sound.
             return;
         }
 

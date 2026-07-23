@@ -1,0 +1,83 @@
+File	Line (16-bit wav)
+1.wav	Another trial bends to your will. Do not preen — the maze has broken finer souls than you.
+2.wav	You solve what others could not. Perhaps there is iron in you after all.
+3.wav	A task undone becomes a task conquered. Small glory — glory nonetheless.
+4.wav	The walls expected you to fail there. You have a talent for disappointing them.
+success.wav The gate opens at last. You faced every trial this maze could conjure, and you did not break. Enter, worthy one — the treasures beyond are yours, and my respect with them. Few have ever earned either.
+fail.wav    Did you really think it would be this easy? Try again when you're a worthy of what comes...
+6.wav	You struggle, you strain, and still you prevail. Stubborn creature. I approve.
+7.wav	Many hands have reached for that and withered. Yours did not. Curious.
+8.wav	A worthy effort. Do not let it swell your head, or the maze will shrink it for you.
+9.wav	You move like one with something to prove. Prove it, then. I am watching.
+10.wav	Done, and done well. I have cursed travelers for far less competence.
+11.wav	The trial resists; you insist. I have always favored the insistent.
+12.wav	So the treasure tempts you still. Good. Hunger keeps a traveler sharp.
+13.wav	You bleed, you falter, you rise. That last part is the only one that matters.
+14.wav	Neatly overcome. The dead who line these halls managed no such grace.
+15.wav	You surprise me — and I am not easily surprised. Do it again.
+16.wav	A lesser soul would have wept and turned back. You merely pressed on. Respect.
+17.wav	The maze offered you ruin, and you refused it. Bold. Foolish. Admirable.
+18.wav	Another lock yields to you. Do not mistake open doors for welcome.
+19.wav	You have skill. The graveyard beyond these walls is full of those who had skill.
+20.wav	Well struck, traveler. Even an ancient thing can be made to raise an eyebrow.
+21.wav	You endure what would unmake most. I begin to see why you dared come at all.
+22.wav	The task is behind you. The danger is not. Savor nothing.
+23.wav	Competent. Composed. Almost worthy. Almost is a cruel word, is it not?
+24.wav	You do not flinch from hardship. A rare spine, for a creature so small.
+25.wav	That trial has devoured champions. It merely bruised you. Impressive.
+26.wav	Press on, then. You have earned the right to suffer what comes.
+27.wav	I mock you, yes. But I do not mock your resolve — that, I would not dare.
+28.wav	The maze tightens around you, and still you slip free. Determined thing. Good.
+29.wav	You have a warrior's patience. Do not spend it all in one place.
+30.wav	Another shackle falls. The gate does not care — but I noticed.
+31.wav	You fight as though the treasure were already yours. Arrogance, or foresight?
+32.wav	Done. The weak would call it luck. I have watched too long to believe in luck.
+33.wav	You keep your feet where others lost their heads. Steady. I value steadiness.
+34.wav	A fine unraveling of a wicked knot. The maze weaves them crueller still.
+35.wav	You persist past all reason. Reason is overrated in this place.
+36.wav	That was no small thing you overcame. Do not pretend it was.
+37.wav	You wear hardship like armor now. It suits you better than fear did.
+38.wav	The path fought you and lost. Enjoy it — the path has a long memory.
+39.wav	Clever hands, clear eyes, and a spine that will not bend. Rare. Dangerous. Worthy.
+40.wav	You bleed and still choose to continue. Few make that choice twice.
+41.wav	The maze whispers of you now — and it does not whisper of the weak.
+42.wav	You do what the fallen could not. Their bones make a fine road for your feet.
+43.wav	Impressive. Yet I withhold the word "worthy." You have not earned it. Not yet.
+44.wav	The riddle broke, not you. That is the correct order of things.
+45.wav	You strive, and striving is holy here. The idle rot where they stand.
+46.wav	A trap sprung and survived. The maze will not be so gentle twice.
+47.wav	You carry yourself like one who expects to win. See that the maze does not humble you.
+48.wav	Overcome, and cleanly. I have watched kings make a mess of easier things.
+49.wav	Your will does not waver. Mine, watching you, begins to bend. Slightly.
+50.wav	Another test left in ashes. Do not warm yourself too long by that fire.
+51.wav	You have the makings of a legend — or a cautionary tale. The maze decides which.
+52.wav	Deftly done. Do not let my grudging tone fool you. That was well fought.
+53.wav	The treasure is not for the many. You begin to move like one of the few.
+54.wav	You unmade that trial with a calm that unsettles even me. Stay unsettling.
+55.wav	Every obstacle you break makes the rest crueller. You asked for this.
+56.wav	A steady hand, in a place built to make hands shake. I mark it. I remember it.
+57.wav	You do not beg the maze for mercy. You take what you came for. I respect the theft.
+58.wav	Done. The proud have died at gentler gates. You are proud, and still standing.
+59.wav	The maze tests flesh and spirit alike. Yours have both held. For now.
+60.wav	You move with the certainty of the doomed, or the destined. I cannot yet tell which.
+61.wav	Another wall between you and glory, reduced to dust. Do not choke on it.
+62.wav	You have earned no rest — only the honor of another trial. Take it, and be silent.
+63.wav	Skillful. Relentless. Almost enough to make an ancient thing believe in you.
+64.wav	The graveyard whispered your name today. It was wrong. You are still here.
+65.wav	You bend the trials to your purpose. Purpose is the only prayer this maze answers.
+66.wav	That was well done — and I do not spend those words on the unworthy.
+67.wav	You survive by cunning where others died by pride. Do not trade one for the other.
+68.wav	The maze offered you an easy death. You declined. How very like you.
+69.wav	Another triumph — small, beside what remains, but yours. Wholly yours.
+70.wav	You have the look of one the treasure has already chosen. Do not prove it wrong.
+71.wav	Cleanly conquered. I have outlasted empires, and still you hold my eye.
+72.wav	The trial is broken. So are most who attempt it. You are neither. Remarkable.
+73.wav	You press where the air itself says stop. Deafness to fear is its own strange gift.
+74.wav	Well fought, traveler. The maze does not forgive — but even it must acknowledge.
+75.wav	You have shed doubt like an old skin. What remains is lean, and hard, and worthy.
+76.wav	Another lock undone. The gate draws no nearer for the unworthy — but for you, perhaps.
+77.wav  Congratulations on completing your first tile! But your path has only just begun.
+78.wav	You conquer, and you do not gloat. A discipline most travelers never learn before they die.
+79.wav	The maze threw its malice at you, and you simply… continued. That is the whole of greatness.
+80.wav	I have insulted you at every turn — and at every turn, you have earned less of it.
+81.wav	You break another trial as though it owed you. Perhaps it did. Perhaps you are owed much.

@@ -145,7 +145,8 @@
       "Bash(cat /tmp/rl_extract/Hitsplat.java)",
       "Bash(cat /tmp/rl_extract/HitsplatID.java)",
       "Bash(cat /tmp/rl_extract/HitsplatApplied.java)",
-      "Bash(node gen.js)"
+      "Bash(node gen.js)",
+      "PowerShell(cd \"c:\\\\Users\\\\Tibo Declercq\\\\Documents\\\\Maze Bingo\\\\runelite-plugin\"; Get-ChildItem | Where-Object { $_.Name -match \"gradle|build|pom|settings\" } | Select-Object Name; \"---\"; \\(Get-Command gradle -ErrorAction SilentlyContinue\\).Source)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

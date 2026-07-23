@@ -653,7 +653,7 @@ public class MazeBingoPlugin extends Plugin {
                             : new Color(255, 204, 0);
                         panel.addEvent(e.message, color);
                         boolean showPopup = !"tile_complete".equals(e.type) || config.tileCompletionPopupEnabled();
-                        notifOverlay.addNotification(e.message, color, showPopup);
+                        notifOverlay.addNotification(e, color, showPopup);
                         lastSeenEventId = e.id;
                     }
                 }

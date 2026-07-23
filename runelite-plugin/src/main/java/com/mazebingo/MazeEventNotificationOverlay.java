@@ -6,6 +6,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetModalMode;
 import net.runelite.client.audio.AudioPlayer;
 import net.runelite.client.callback.ClientThread;
+import com.mazebingo.model.MazeEventEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,14 +39,14 @@ public class MazeEventNotificationOverlay {
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
 
-    public synchronized void addNotification(String message, Color ignored, boolean showPopup) {
-        playSound(message);
+    public synchronized void addNotification(MazeEventEntry event, Color ignored, boolean showPopup) {
+        playSound(event);
         if (!showPopup) {
             return;
         }
-        queue.add(message);
+        queue.add(event.message);
         if (queue.size() == 1) {
-            showPopup(message);
+            showPopup(event.message);
         }
     }
 
@@ -68,27 +69,82 @@ public class MazeEventNotificationOverlay {
         });
     }
 
-    private void playSound(String message) {
+    private void playSound(MazeEventEntry event) {
         if (!config.soundsEnabled() || config.soundVolume() <= 0) {
             return;
         }
 
-        String lowerMsg = message.toLowerCase();
+        float gainDb = volumeToGainDb(config.soundVolume());
+        MazeSoundPack pack = config.soundPack();
+        if (pack == MazeSoundPack.LORE) {
+            playLoreSound(event, gainDb);
+        } else {
+            playCategorySound(event.message, pack, gainDb);
+        }
+    }
+
+    /**
+     * Default/Custom packs pick one of four sounds from the event message. Custom plays the user's own
+     * file when present, otherwise falls through to the bundled Default sound (classpathResource maps
+     * CUSTOM to the default folder).
+     */
+    private void playCategorySound(String message, MazeSoundPack pack, float gainDb) {
+        String lowerMsg = message == null ? "" : message.toLowerCase();
         MazeSound sound = lowerMsg.contains("completed the end tile") ? MazeSound.SUCCESS
             : lowerMsg.contains("has found a key") ? MazeSound.SPECIAL
-            : lowerMsg.contains("keys") ? MazeSound.FAIL:
-            MazeSound.COMPLETION;
-        float gainDb = volumeToGainDb(config.soundVolume());
+            : lowerMsg.contains("keys") ? MazeSound.FAIL
+            : MazeSound.COMPLETION;
 
         // Playback touches disk (custom sound file lookup) so it must not run on the client thread.
         executorService.submit(() -> {
             try {
-                File custom = SoundGenerator.customFile(sound);
-                if (custom != null && custom.isFile()) {
-                    audioPlayer.play(custom, gainDb);
-                    return;
+                if (pack == MazeSoundPack.CUSTOM) {
+                    File custom = SoundGenerator.customFile(sound);
+                    if (custom != null && custom.isFile()) {
+                        audioPlayer.play(custom, gainDb);
+                        return;
+                    }
                 }
-                String resource = SoundGenerator.classpathResource(sound);
+                String resource = SoundGenerator.classpathResource(pack, sound);
+                if (resource != null) {
+                    audioPlayer.play(SoundGenerator.class, resource, gainDb);
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to play notification sound", ex);
+            }
+        });
+    }
+
+    /**
+     * The Lore pack gives each maze tile its own numbered sound (tile N -> lore/N.wav) and uses dedicated
+     * success/fail sounds for the end tile. Key-found and keys-missing events are intentionally silent.
+     * Any tile without a bundled Lore file falls back to the matching Default category sound.
+     */
+    private void playLoreSound(MazeEventEntry event, float gainDb) {
+        String lowerMsg = event.message == null ? "" : event.message.toLowerCase();
+
+        final String loreFilename;
+        final MazeSound fallback;
+        if ("gameover".equals(event.type)) {
+            loreFilename = "fail.wav";
+            fallback = MazeSound.FAIL;
+        } else if (lowerMsg.contains("completed the end tile")) {
+            loreFilename = "success.wav";
+            fallback = MazeSound.SUCCESS;
+        } else if ("tile_complete".equals(event.type)) {
+            loreFilename = event.tileId + ".wav";
+            fallback = MazeSound.COMPLETION;
+        } else {
+            // Key found / keys missing: no Lore sound.
+            return;
+        }
+
+        executorService.submit(() -> {
+            try {
+                String lore = SoundGenerator.loreResourceIfPresent(loreFilename);
+                String resource = lore != null
+                    ? lore
+                    : SoundGenerator.classpathResource(MazeSoundPack.DEFAULT, fallback);
                 if (resource != null) {
                     audioPlayer.play(SoundGenerator.class, resource, gainDb);
                 }

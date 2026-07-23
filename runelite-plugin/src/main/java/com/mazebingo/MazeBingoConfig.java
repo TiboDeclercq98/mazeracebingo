@@ -59,10 +59,22 @@ public interface MazeBingoConfig extends Config {
         return 100;
     }
 
+    @ConfigItem(
+        keyName = "soundPack",
+        name = "Sound files",
+        description = "Which set of notification sounds to use. Custom plays your own files from "
+            + ".runelite/mazebingo/sounds, falling back to the Default sound for any file you have not provided.",
+        section = "sounds",
+        position = 5
+    )
+    default MazeSoundPack soundPack() {
+        return MazeSoundPack.DEFAULT;
+    }
+
     @ConfigSection(
         name = "Pop-up",
         description = "Modal pop-up notification settings",
-        position = 5
+        position = 6
     )
     String popup = "popup";
 
@@ -71,7 +83,7 @@ public interface MazeBingoConfig extends Config {
         name = "Tile completion pop-up",
         description = "Show the modal pop-up notification when a tile is completed. Only affects what you see.",
         section = "popup",
-        position = 6
+        position = 7
     )
     default boolean tileCompletionPopupEnabled() {
         return true;
@@ -80,7 +92,7 @@ public interface MazeBingoConfig extends Config {
     @ConfigSection(
         name = "Chat Messages",
         description = "Which progress messages are sent to your chatbox. Only affects your own chat.",
-        position = 7
+        position = 8
     )
     String chatMessages = "chatMessages";
 
@@ -89,7 +101,7 @@ public interface MazeBingoConfig extends Config {
         name = "XP gain contributions",
         description = "Show \"You contributed...\" chat messages for XP gain tiles",
         section = "chatMessages",
-        position = 8
+        position = 9
     )
     default boolean chatContributionXp() {
         return true;
@@ -100,7 +112,7 @@ public interface MazeBingoConfig extends Config {
         name = "NPC kill contributions",
         description = "Show \"You contributed...\" chat messages for NPC kill tiles",
         section = "chatMessages",
-        position = 9
+        position = 10
     )
     default boolean chatContributionNpcKill() {
         return true;
@@ -111,7 +123,7 @@ public interface MazeBingoConfig extends Config {
         name = "Agility lap contributions",
         description = "Show \"You contributed...\" chat messages for agility lap tiles",
         section = "chatMessages",
-        position = 10
+        position = 11
     )
     default boolean chatContributionAgilityLap() {
         return true;
@@ -122,7 +134,7 @@ public interface MazeBingoConfig extends Config {
         name = "Minigame completion contributions",
         description = "Show \"You contributed...\" chat messages for minigame completion tiles",
         section = "chatMessages",
-        position = 11
+        position = 12
     )
     default boolean chatContributionMinigame() {
         return true;
@@ -133,7 +145,7 @@ public interface MazeBingoConfig extends Config {
         name = "Item drop contributions",
         description = "Show \"You contributed...\" chat messages for item drop tiles",
         section = "chatMessages",
-        position = 12
+        position = 13
     )
     default boolean chatContributionItemDrop() {
         return true;
@@ -144,7 +156,7 @@ public interface MazeBingoConfig extends Config {
         name = "GP value contributions",
         description = "Show \"You contributed...\" chat messages for GP value tiles",
         section = "chatMessages",
-        position = 13
+        position = 14
     )
     default boolean chatContributionGpValue() {
         return true;
@@ -155,7 +167,7 @@ public interface MazeBingoConfig extends Config {
         name = "NPC damage contributions",
         description = "Show \"You contributed...\" chat messages for NPC damage tiles",
         section = "chatMessages",
-        position = 14
+        position = 15
     )
     default boolean chatContributionNpcDamage() {
         return true;
@@ -166,7 +178,7 @@ public interface MazeBingoConfig extends Config {
         name = "Clue completion contributions",
         description = "Show \"You contributed...\" chat messages for clue scroll completion tiles",
         section = "chatMessages",
-        position = 15
+        position = 16
     )
     default boolean chatContributionClueCompletion() {
         return true;
@@ -177,7 +189,7 @@ public interface MazeBingoConfig extends Config {
         name = "Error messages",
         description = "Show error messages in chat when a progress submission fails",
         section = "chatMessages",
-        position = 16
+        position = 17
     )
     default boolean chatErrorMessages() {
         return true;
@@ -188,7 +200,7 @@ public interface MazeBingoConfig extends Config {
         name = "Tile completion messages",
         description = "Show a chat message when you complete a tile",
         section = "chatMessages",
-        position = 17
+        position = 18
     )
     default boolean chatCompletionMessages() {
         return true;
@@ -199,7 +211,7 @@ public interface MazeBingoConfig extends Config {
         name = "Special event messages",
         description = "Show special event chat messages (e.g. game over, bonus events)",
         section = "chatMessages",
-        position = 18
+        position = 19
     )
     default boolean chatSpecialEventMessages() {
         return true;

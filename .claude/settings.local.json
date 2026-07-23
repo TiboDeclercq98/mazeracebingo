@@ -144,7 +144,8 @@
       "Bash(pwd; ls *)",
       "Bash(cat /tmp/rl_extract/Hitsplat.java)",
       "Bash(cat /tmp/rl_extract/HitsplatID.java)",
-      "Bash(cat /tmp/rl_extract/HitsplatApplied.java)"
+      "Bash(cat /tmp/rl_extract/HitsplatApplied.java)",
+      "Bash(node gen.js)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Tibo Declercq\\.claude",

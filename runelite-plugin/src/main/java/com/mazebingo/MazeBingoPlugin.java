@@ -180,6 +180,7 @@ public class MazeBingoPlugin extends Plugin {
         if (executor != null) {
             executor.shutdownNow();
         }
+        notifOverlay.shutdown();
         clientToolbar.removeNavigation(navButton);
         panel.setOnRefresh(null);
         activeTiles.clear();

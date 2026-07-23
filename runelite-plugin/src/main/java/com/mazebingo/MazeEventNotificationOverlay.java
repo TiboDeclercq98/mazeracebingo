@@ -4,7 +4,6 @@ import net.runelite.api.Client;
 import net.runelite.api.WidgetNode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetModalMode;
-import net.runelite.client.audio.AudioPlayer;
 import net.runelite.client.callback.ClientThread;
 import com.mazebingo.model.MazeEventEntry;
 import org.slf4j.Logger;
@@ -12,11 +11,20 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.FloatControl;
+import javax.sound.sampled.LineEvent;
 import java.awt.Color;
 import java.io.File;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Singleton
 public class MazeEventNotificationOverlay {
@@ -32,12 +40,24 @@ public class MazeEventNotificationOverlay {
 
     @Inject private Client client;
     @Inject private ClientThread clientThread;
-    @Inject private AudioPlayer audioPlayer;
     @Inject private MazeBingoConfig config;
-    @Inject private ScheduledExecutorService executorService;
+
+    // Notification sounds play on a dedicated single thread so that multiple tasks completed in one maze
+    // refresh are announced one after another instead of overlapping. Each clip blocks its task until it
+    // finishes, so the executor's queue drains sequentially.
+    private final ExecutorService soundExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "maze-bingo-sound");
+        t.setDaemon(true);
+        return t;
+    });
 
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
+
+    /** Opens the audio for one sound; resolved on the sound thread. Returns null when there is nothing to play. */
+    private interface AudioSource {
+        AudioInputStream open() throws Exception;
+    }
 
     public synchronized void addNotification(MazeEventEntry event, Color ignored, boolean showPopup) {
         playSound(event);
@@ -95,24 +115,16 @@ public class MazeEventNotificationOverlay {
             : lowerMsg.contains("keys") ? MazeSound.FAIL
             : MazeSound.COMPLETION;
 
-        // Playback touches disk (custom sound file lookup) so it must not run on the client thread.
-        executorService.submit(() -> {
-            try {
-                if (pack == MazeSoundPack.CUSTOM) {
-                    File custom = SoundGenerator.customFile(sound);
-                    if (custom != null && custom.isFile()) {
-                        audioPlayer.play(custom, gainDb);
-                        return;
-                    }
+        // Resolution touches disk (custom sound lookup), so it runs on the sound thread rather than the caller.
+        enqueue(() -> {
+            if (pack == MazeSoundPack.CUSTOM) {
+                File custom = SoundGenerator.customFile(sound);
+                if (custom != null && custom.isFile()) {
+                    return AudioSystem.getAudioInputStream(custom);
                 }
-                String resource = SoundGenerator.classpathResource(pack, sound);
-                if (resource != null) {
-                    audioPlayer.play(SoundGenerator.class, resource, gainDb);
-                }
-            } catch (Exception ex) {
-                log.warn("Failed to play notification sound", ex);
             }
-        });
+            return openResource(SoundGenerator.classpathResource(pack, sound));
+        }, gainDb);
     }
 
     /**
@@ -139,19 +151,70 @@ public class MazeEventNotificationOverlay {
             return;
         }
 
-        executorService.submit(() -> {
+        enqueue(() -> {
+            String lore = SoundGenerator.loreResourceIfPresent(loreFilename);
+            return openResource(lore != null
+                ? lore
+                : SoundGenerator.classpathResource(MazeSoundPack.DEFAULT, fallback));
+        }, gainDb);
+    }
+
+    /** Queues a sound for sequential playback on the sound thread. */
+    private void enqueue(AudioSource source, float gainDb) {
+        soundExecutor.submit(() -> {
             try {
-                String lore = SoundGenerator.loreResourceIfPresent(loreFilename);
-                String resource = lore != null
-                    ? lore
-                    : SoundGenerator.classpathResource(MazeSoundPack.DEFAULT, fallback);
-                if (resource != null) {
-                    audioPlayer.play(SoundGenerator.class, resource, gainDb);
-                }
+                playBlocking(source, gainDb);
             } catch (Exception ex) {
                 log.warn("Failed to play notification sound", ex);
             }
         });
+    }
+
+    /** Plays one clip and blocks until it has finished, so the next queued sound does not overlap it. */
+    private void playBlocking(AudioSource source, float gainDb) throws Exception {
+        try (AudioInputStream in = source.open()) {
+            if (in == null) {
+                return;
+            }
+            Clip clip = AudioSystem.getClip();
+            try {
+                CountDownLatch finished = new CountDownLatch(1);
+                clip.addLineListener(ev -> {
+                    if (ev.getType() == LineEvent.Type.STOP) {
+                        finished.countDown();
+                    }
+                });
+                clip.open(in);
+                setGain(clip, gainDb);
+                clip.start();
+                // Bounded so a clip that never signals STOP cannot wedge the queue; comfortably longer
+                // than any notification sound.
+                finished.await(30, TimeUnit.SECONDS);
+            } finally {
+                clip.close();
+            }
+        }
+    }
+
+    private static AudioInputStream openResource(String resource) throws Exception {
+        if (resource == null) {
+            return null;
+        }
+        URL url = SoundGenerator.class.getResource(resource);
+        return url == null ? null : AudioSystem.getAudioInputStream(url);
+    }
+
+    private static void setGain(Clip clip, float gainDb) {
+        if (!clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            return;
+        }
+        FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+        gain.setValue(Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), gainDb)));
+    }
+
+    /** Stops the sound thread; called when the plugin shuts down. */
+    public void shutdown() {
+        soundExecutor.shutdownNow();
     }
 
     private synchronized boolean tryClearMessage() {

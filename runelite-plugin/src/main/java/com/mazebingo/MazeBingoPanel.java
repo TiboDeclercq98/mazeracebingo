@@ -20,6 +20,8 @@ import java.util.function.Consumer;
 public class MazeBingoPanel extends PluginPanel {
 
     private static final int MAX_EVENTS = 8;
+    /** A task row's own left/right border (6px each), plus a small margin so text never touches the edge. */
+    private static final int ROW_HORIZONTAL_PADDING = 16;
 
     private final JLabel statusLabel;
     private final JPanel tilesPanel;
@@ -207,25 +209,49 @@ public class MazeBingoPanel extends PluginPanel {
         JPanel row = new JPanel(new BorderLayout(0, 3));
         row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         row.setBorder(new EmptyBorder(5, 6, 5, 6));
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 55));
 
-        JLabel nameLabel = new JLabel("Tile " + tile.id + ": " + tile.description);
+        String name = "Tile " + tile.id + ": " + tile.description;
+        // Wrap instead of clipping: task descriptions are longer than the side panel is wide.
+        JLabel nameLabel = new JLabel("<html><body style='width:" + taskTextWidth() + "px'>"
+            + escapeHtml(name) + "</body></html>");
         nameLabel.setForeground(Color.WHITE);
         nameLabel.setFont(FontManager.getRunescapeSmallFont());
+        nameLabel.setToolTipText(name);
 
         int req = tile.completionsRequired > 0 ? tile.completionsRequired : 1;
         int pct = (int) Math.min(100.0, (tile.completionsDone * 100.0) / req);
 
+        String progress = progressString(tile);
         JProgressBar bar = new JProgressBar(0, 100);
         bar.setValue(pct);
         bar.setStringPainted(true);
-        bar.setString(progressString(tile));
+        bar.setString(progress);
+        bar.setFont(FontManager.getRunescapeSmallFont());
+        bar.setToolTipText(progress);
         bar.setForeground(new Color(76, 175, 80));
         bar.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
+        bar.setPreferredSize(new Dimension(0, 16));
 
         row.add(nameLabel, BorderLayout.NORTH);
         row.add(bar, BorderLayout.SOUTH);
+        // Height must follow the (possibly multi-line) label, or BoxLayout clips the wrapped text.
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
         return row;
+    }
+
+    /** Width available for a task row's text, i.e. the tasks panel minus its own and the row's padding. */
+    private int taskTextWidth() {
+        int width = tilesPanel.getWidth();
+        if (width <= 0) {
+            // Not laid out yet: fall back to the fixed side panel width minus this panel's border.
+            width = PluginPanel.PANEL_WIDTH - 20;
+        }
+        Insets insets = tilesPanel.getInsets();
+        return Math.max(100, width - insets.left - insets.right - ROW_HORIZONTAL_PADDING);
+    }
+
+    private static String escapeHtml(String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private String progressString(ActiveTile tile) {

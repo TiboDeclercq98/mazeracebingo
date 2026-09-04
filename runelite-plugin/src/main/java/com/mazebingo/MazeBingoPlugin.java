@@ -10,6 +10,7 @@ import com.mazebingo.model.TileData;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import java.awt.Color;
 import net.runelite.api.GameState;
@@ -31,6 +32,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
@@ -110,6 +112,12 @@ public class MazeBingoPlugin extends Plugin {
     // NPC kill tracking: npcIndex → NPC reference for every NPC the player has hit
     private final Map<Integer, NPC> attackedNpcs = new HashMap<>();
 
+    // npcIndex → game tick a kill was credited on. One kill can surface as an ActorDeath, a
+    // dead-flagged NPC on the tick poll, a despawn and an NPC loot drop; this keeps only the
+    // first of those. Entries expire so a reused NPC index can still be credited later.
+    private final Map<Integer, Integer> creditedKills = new HashMap<>();
+    private static final int KILL_CREDIT_TICKS = 10;
+
     // Dedup: "tileId:itemName" → game tick of last submit; prevents double-counting when
     // both onNpcLootReceived and onLootReceived fire for the same NPC kill
     private final Map<String, Integer> recentSubmits = new HashMap<>();
@@ -186,6 +194,7 @@ public class MazeBingoPlugin extends Plugin {
         activeTiles.clear();
         xpSnapshot.clear();
         attackedNpcs.clear();
+        creditedKills.clear();
         recentSubmits.clear();
         lastKnownVersion = null;
         lastSeenEventId = 0;
@@ -206,6 +215,7 @@ public class MazeBingoPlugin extends Plugin {
             activeTiles.clear();
             xpSnapshot.clear();
             attackedNpcs.clear();
+            creditedKills.clear();
             recentSubmits.clear();
             selectedTileId = -1;
             lastKnownVersion = null;
@@ -290,13 +300,20 @@ public class MazeBingoPlugin extends Plugin {
         attackedNpcs.put(npc.getIndex(), npc);
 
         int dmg = event.getHitsplat().getAmount();
-        String npcName = npc.getName();
+        String npcName = cleanNpcName(npc);
         if (dmg > 0 && npcName != null) {
             List<ActiveTile> matches = matchingTiles("npc_damage", cfg -> npcMatches(cfg, npcName));
             for (ActiveTile tile : matches) {
                 submitProgress(tile, dmg, npcName);
             }
         }
+    }
+
+    // NPC names can carry colour tags (e.g. "<col=00ffff>Unstable ice</col>"), which would never
+    // equal the plain name a tile is configured with.
+    private static String cleanNpcName(NPC npc) {
+        String name = npc.getName();
+        return name == null ? null : Text.removeTags(name);
     }
 
     private static boolean npcMatches(JsonObject cfg, String npcName) {
@@ -311,42 +328,72 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onGameTick(GameTick event) {
+        int tick = client.getTickCount();
+        recentSubmits.entrySet().removeIf(e -> tick - e.getValue() > 1);
+        creditedKills.entrySet().removeIf(e -> tick - e.getValue() > KILL_CREDIT_TICKS);
         checkDeadNpcs();
     }
 
+    // Primary kill signal: fires the moment the death animation starts, before any despawn.
+    @Subscribe
+    public void onActorDeath(ActorDeath event) {
+        if (!(event.getActor() instanceof NPC)) return;
+        NPC npc = (NPC) event.getActor();
+        if (!attackedNpcs.containsKey(npc.getIndex())) return;
+        creditKill(npc, "death");
+    }
+
+    // Fallback for NPCs whose ActorDeath was missed (e.g. the plugin started mid-fight).
     private void checkDeadNpcs() {
-        recentSubmits.entrySet().removeIf(e -> client.getTickCount() - e.getValue() > 1);
-        Iterator<Map.Entry<Integer, NPC>> it = attackedNpcs.entrySet().iterator();
-        while (it.hasNext()) {
-            NPC npc = it.next().getValue();
-            if (!npc.isDead()) continue;
-            it.remove();
-            String npcName = npc.getName();
-            if (npcName == null) continue;
-            log.info("Kill detected: npcName='{}'", npcName);
-            List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> npcMatches(cfg, npcName));
-            log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
-            if (matches.isEmpty()) {
-                // Tile may have just been revealed but not yet loaded — refresh and retry once
-                executor.execute(() -> {
-                    refreshMazeState();
-                    List<ActiveTile> retry = matchingTiles("npc_kill", cfg -> npcMatches(cfg, npcName));
-                    log.info("Retry matched {} tile(s) for npc_kill '{}'", retry.size(), npcName);
-                    for (ActiveTile tile : retry) {
-                        submitProgress(tile, 1, npcName);
-                    }
-                });
-            } else {
-                for (ActiveTile tile : matches) {
-                    submitProgress(tile, 1, npcName);
-                }
-            }
+        for (NPC npc : new ArrayList<>(attackedNpcs.values())) {
+            if (npc.isDead()) creditKill(npc, "dead-flag");
         }
     }
 
     @Subscribe
     public void onNpcDespawned(NpcDespawned event) {
-        attackedNpcs.remove(event.getNpc().getIndex());
+        NPC npc = event.getNpc();
+        // Bosses that vanish on the same tick they die never leave a dead NPC behind for the
+        // per-tick poll to see, so credit here before dropping the entry.
+        if (npc.isDead() && attackedNpcs.containsKey(npc.getIndex())) {
+            creditKill(npc, "despawn");
+        }
+        attackedNpcs.remove(npc.getIndex());
+    }
+
+    // Last-resort kill signal for bosses that produce no observable death or despawn state:
+    // receiving their loot means they died.
+    private void creditKillFromLoot(NPC npc) {
+        if (npc == null) return;
+        creditKill(npc, "loot");
+    }
+
+    private void creditKill(NPC npc, String source) {
+        int index = npc.getIndex();
+        if (creditedKills.containsKey(index)) return;
+        String npcName = cleanNpcName(npc);
+        if (npcName == null) return;
+        creditedKills.put(index, client.getTickCount());
+        attackedNpcs.remove(index);
+
+        log.info("Kill detected via {}: npcName='{}'", source, npcName);
+        List<ActiveTile> matches = matchingTiles("npc_kill", cfg -> npcMatches(cfg, npcName));
+        log.info("Matched {} tile(s) for npc_kill '{}'", matches.size(), npcName);
+        if (matches.isEmpty()) {
+            // Tile may have just been revealed but not yet loaded — refresh and retry once
+            executor.execute(() -> {
+                refreshMazeState();
+                List<ActiveTile> retry = matchingTiles("npc_kill", cfg -> npcMatches(cfg, npcName));
+                log.info("Retry matched {} tile(s) for npc_kill '{}'", retry.size(), npcName);
+                for (ActiveTile tile : retry) {
+                    submitProgress(tile, 1, npcName);
+                }
+            });
+        } else {
+            for (ActiveTile tile : matches) {
+                submitProgress(tile, 1, npcName);
+            }
+        }
     }
 
     // --- Agility laps, minigame completions & clue scrolls ---
@@ -396,6 +443,7 @@ public class MazeBingoPlugin extends Plugin {
 
     @Subscribe
     public void onNpcLootReceived(NpcLootReceived event) {
+        creditKillFromLoot(event.getNpc());
         for (ItemStack stack : event.getItems()) {
             String itemName = itemManager.getItemComposition(stack.getId()).getName();
             List<ActiveTile> matches = matchingTiles("item_drop", cfg -> {

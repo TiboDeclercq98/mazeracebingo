@@ -12,6 +12,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Set;
@@ -180,9 +181,11 @@ public class MazeBingoPanel extends PluginPanel {
             eventFeedPanel.add(empty);
         } else {
             for (String[] entry : recentEvents) {
-                JLabel lbl = new JLabel("<html><body style='width:160px'>" + entry[0] + "</body></html>");
+                JLabel lbl = new JLabel();
                 lbl.setForeground(Color.decode("#" + entry[1]));
                 lbl.setFont(FontManager.getRunescapeSmallFont());
+                lbl.setText(wrapHtml(entry[0], lbl, rowTextWidth(eventFeedPanel)));
+                lbl.setToolTipText(entry[0]);
                 lbl.setBorder(new EmptyBorder(2, 6, 2, 6));
                 eventFeedPanel.add(lbl);
             }
@@ -211,11 +214,10 @@ public class MazeBingoPanel extends PluginPanel {
         row.setBorder(new EmptyBorder(5, 6, 5, 6));
 
         String name = "Tile " + tile.id + ": " + tile.description;
-        // Wrap instead of clipping: task descriptions are longer than the side panel is wide.
-        JLabel nameLabel = new JLabel("<html><body style='width:" + taskTextWidth() + "px'>"
-            + escapeHtml(name) + "</body></html>");
+        JLabel nameLabel = new JLabel();
         nameLabel.setForeground(Color.WHITE);
         nameLabel.setFont(FontManager.getRunescapeSmallFont());
+        nameLabel.setText(wrapHtml(name, nameLabel, rowTextWidth(tilesPanel)));
         nameLabel.setToolTipText(name);
 
         int req = tile.completionsRequired > 0 ? tile.completionsRequired : 1;
@@ -239,15 +241,60 @@ public class MazeBingoPanel extends PluginPanel {
         return row;
     }
 
-    /** Width available for a task row's text, i.e. the tasks panel minus its own and the row's padding. */
-    private int taskTextWidth() {
-        int width = tilesPanel.getWidth();
-        if (width <= 0) {
-            // Not laid out yet: fall back to the fixed side panel width minus this panel's border.
-            width = PluginPanel.PANEL_WIDTH - 20;
+    /**
+     * Width available for the text of a row inside {@code container}: the side panel minus this panel's
+     * border, the container's titled border and the row's own padding. Derived from this panel rather than
+     * from the container, whose width is meaningless until it holds a full-width row.
+     */
+    private int rowTextWidth(JPanel container) {
+        int width = getWidth() > 0 ? getWidth() : PluginPanel.PANEL_WIDTH;
+        Insets panelInsets = getInsets();
+        Insets containerInsets = container.getInsets();
+        return Math.max(80, width - panelInsets.left - panelInsets.right
+            - containerInsets.left - containerInsets.right - ROW_HORIZONTAL_PADDING);
+    }
+
+    /**
+     * Renders {@code text} as HTML broken into lines that fit {@code maxWidth} in {@code label}'s font.
+     * The breaks have to be measured here: a CSS {@code width} only hints at where Swing's HTML view
+     * should wrap, and it lays out wider than asked, which clips long task names at the panel's edge.
+     */
+    private static String wrapHtml(String text, JLabel label, int maxWidth) {
+        FontMetrics metrics = label.getFontMetrics(label.getFont());
+        List<String> lines = new ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (String word : text.trim().split("\\s+")) {
+            if (line.length() > 0 && metrics.stringWidth(line + " " + word) > maxWidth) {
+                lines.add(line.toString());
+                line.setLength(0);
+            }
+            if (line.length() > 0) {
+                line.append(' ');
+            }
+            // A word too long for a line of its own (a pasted item name, say) is split mid-word.
+            while (word.length() > 1 && metrics.stringWidth(line + word) > maxWidth) {
+                int fit = word.length();
+                while (fit > 1 && metrics.stringWidth(line + word.substring(0, fit)) > maxWidth) {
+                    fit--;
+                }
+                lines.add(line.toString() + word.substring(0, fit));
+                line.setLength(0);
+                word = word.substring(fit);
+            }
+            line.append(word);
         }
-        Insets insets = tilesPanel.getInsets();
-        return Math.max(100, width - insets.left - insets.right - ROW_HORIZONTAL_PADDING);
+        if (line.length() > 0) {
+            lines.add(line.toString());
+        }
+
+        StringBuilder html = new StringBuilder("<html>");
+        for (int i = 0; i < lines.size(); i++) {
+            if (i > 0) {
+                html.append("<br>");
+            }
+            html.append(escapeHtml(lines.get(i)));
+        }
+        return html.append("</html>").toString();
     }
 
     private static String escapeHtml(String text) {

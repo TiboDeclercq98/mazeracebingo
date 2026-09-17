@@ -1,7 +1,7 @@
 package com.mazebingo;
 
 public enum MazeSoundPack {
-    DEFAULT("Default"),
+    MEME("Meme"),
     LORE("Lore"),
     CUSTOM("Custom");
 

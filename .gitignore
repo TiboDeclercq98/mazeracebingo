@@ -5,3 +5,6 @@ Remarks.txt
 runelite-plugin/build/
 runelite-plugin/.gradle/
 .idea/
+Lore texts*.txt
+MazeRaceBingo_Balancer*.xlsx
+~$*

@@ -63,12 +63,12 @@ public interface MazeBingoConfig extends Config {
         keyName = "soundPack",
         name = "Sound files",
         description = "Which set of notification sounds to use. Custom plays your own files from "
-            + ".runelite/mazebingo/sounds, falling back to the Default sound for any file you have not provided.",
+            + ".runelite/mazebingo/sounds, falling back to the Meme sound for any file you have not provided.",
         section = "sounds",
         position = 5
     )
     default MazeSoundPack soundPack() {
-        return MazeSoundPack.DEFAULT;
+        return MazeSoundPack.LORE;
     }
 
     @ConfigSection(

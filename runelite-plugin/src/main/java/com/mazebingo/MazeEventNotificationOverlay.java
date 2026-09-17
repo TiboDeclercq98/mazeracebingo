@@ -104,9 +104,9 @@ public class MazeEventNotificationOverlay {
     }
 
     /**
-     * Default/Custom packs pick one of four sounds from the event message. Custom plays the user's own
-     * file when present, otherwise falls through to the bundled Default sound (classpathResource maps
-     * CUSTOM to the default folder).
+     * Meme/Custom packs pick one of four sounds from the event message. Custom plays the user's own
+     * file when present, otherwise falls through to the bundled Meme sound (classpathResource maps
+     * CUSTOM to the same folder as MEME).
      */
     private void playCategorySound(String message, MazeSoundPack pack, float gainDb) {
         String lowerMsg = message == null ? "" : message.toLowerCase();
@@ -132,7 +132,7 @@ public class MazeEventNotificationOverlay {
      * end-tile sounds. The backend emits exactly one "gameover" event, and only when the end tile is
      * completed, so gameover is always the WIN. A keys-missing event (trying to finish without all keys) is
      * the fail case. Booby-trap "key found" events are intentionally silent. Any tile without a bundled Lore
-     * file falls back to the matching Default category sound.
+     * file falls back to the matching Meme category sound.
      */
     private void playLoreSound(MazeEventEntry event, float gainDb) {
         final String loreFilename;
@@ -157,7 +157,7 @@ public class MazeEventNotificationOverlay {
             String lore = SoundGenerator.loreResourceIfPresent(loreFilename);
             return openResource(lore != null
                 ? lore
-                : SoundGenerator.classpathResource(MazeSoundPack.DEFAULT, fallback));
+                : SoundGenerator.classpathResource(MazeSoundPack.MEME, fallback));
         }, gainDb);
     }
 

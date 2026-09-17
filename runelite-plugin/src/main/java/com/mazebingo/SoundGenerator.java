@@ -23,7 +23,7 @@ class SoundGenerator {
 
     /**
      * Classpath resource path of the bundled sound for this event within the given pack, or null if this
-     * sound has none. The CUSTOM pack has no bundled files of its own, so it resolves to the DEFAULT pack
+     * sound has none. The CUSTOM pack has no bundled files of its own, so it resolves to the MEME pack
      * (which is also the per-file fallback when a user has not supplied their own override).
      */
     static String classpathResource(MazeSoundPack pack, MazeSound sound) {
@@ -31,6 +31,8 @@ class SoundGenerator {
         if (filename == null) {
             return null;
         }
+        // MEME's files live in sounds/default/: the folder is named for its role as the fallback pack,
+        // which every other pack resolves to when it has no file of its own.
         String dir = pack == MazeSoundPack.LORE ? "lore" : "default";
         return "/com/mazebingo/sounds/" + dir + "/" + filename;
     }

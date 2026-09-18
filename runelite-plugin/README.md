@@ -22,8 +22,8 @@ A RuneLite plugin that automatically tracks task progress for **Maze Race Bingo*
 | `xp_gain` | Listens to skill XP changes and reports the delta |
 | `item_drop` | Listens to NPC loot and chest loot; matches item names |
 | `gp_value` | Accumulates the GP value of all received loot using live item prices |
-| `agility_lap` | Detects lap completions at 19 courses by chat message and player location |
-| `minigame` | Matches a configured chat message pattern to detect minigame completions |
+| `agility_lap` | Detects lap completions at 19 courses from Agility XP drops at course endpoints |
+| `minigame_completion` | Matches a configured chat message pattern to detect minigame completions |
 | `clue_completion` | Detects the reward casket chat message ("You have completed X `<tier>` Treasure Trails") and matches the tier |
 
 ### Agility courses supported

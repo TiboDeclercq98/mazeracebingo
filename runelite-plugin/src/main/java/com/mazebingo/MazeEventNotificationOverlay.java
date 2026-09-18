@@ -18,10 +18,14 @@ import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @Singleton
 public class MazeEventNotificationOverlay {
@@ -46,15 +50,32 @@ public class MazeEventNotificationOverlay {
     @Inject private MazeSoundManager soundManager;
     @Inject private AudioPlayer audioPlayer;
 
-    // Notification sounds play on a dedicated single thread so that multiple tasks completed in one maze
-    // refresh are announced one after another instead of overlapping. Each task holds the thread for the
-    // length of its sound, so the executor's queue drains sequentially. Created on demand rather than once: this
-    // singleton outlives a shutDown, so a plugin that is disabled and re-enabled needs a fresh thread.
-    private ExecutorService soundExecutor;
+    // Notification sounds are paced on a scheduled executor so that multiple tasks completed in one maze
+    // refresh are announced one after another instead of overlapping: starting a sound schedules the drain
+    // of the next one for that sound's length, so no thread is held while a sound plays. Created on demand
+    // rather than once: this singleton outlives a shutDown, so a plugin that is disabled and re-enabled
+    // needs a fresh executor.
+    private final Object soundLock = new Object();
+    private final Deque<PendingSound> soundQueue = new ArrayDeque<>();
+    private ScheduledExecutorService soundExecutor;
+    private ScheduledFuture<?> nextDrain;
+    private boolean soundPlaying;
 
-    private synchronized ExecutorService soundExecutor() {
+    /** One queued sound: where to find it, and how loudly to play it. */
+    private static final class PendingSound {
+        final SoundFile source;
+        final float gainDb;
+
+        PendingSound(SoundFile source, float gainDb) {
+            this.source = source;
+            this.gainDb = gainDb;
+        }
+    }
+
+    /** Must be called holding {@link #soundLock}. */
+    private ScheduledExecutorService soundExecutor() {
         if (soundExecutor == null || soundExecutor.isShutdown()) {
-            soundExecutor = Executors.newSingleThreadExecutor(r -> {
+            soundExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "maze-bingo-sound");
                 t.setDaemon(true);
                 return t;
@@ -173,30 +194,57 @@ public class MazeEventNotificationOverlay {
 
     /** Queues a sound for sequential playback on the sound thread. */
     private void enqueue(SoundFile source, float gainDb) {
-        soundExecutor().submit(() -> {
-            try {
-                playBlocking(source, gainDb);
-            } catch (InterruptedException ex) {
-                // The plugin is shutting down; drop the sounds still queued behind this one.
-                Thread.currentThread().interrupt();
-            } catch (Exception ex) {
-                log.warn("Failed to play notification sound", ex);
+        synchronized (soundLock) {
+            soundQueue.add(new PendingSound(source, gainDb));
+            if (!soundPlaying) {
+                soundPlaying = true;
+                scheduleDrain(0);
             }
-        });
+        }
+    }
+
+    /** Must be called holding {@link #soundLock}. */
+    private void scheduleDrain(long delayMillis) {
+        nextDrain = soundExecutor().schedule(this::drain, delayMillis, TimeUnit.MILLISECONDS);
     }
 
     /**
-     * Starts one sound and holds the thread for as long as that sound lasts, so the next queued sound
-     * does not overlap it. An absent file — the normal state before the sound packs have finished
-     * downloading — leaves the notification silent rather than failing.
+     * Starts one queued sound and schedules the next drain for as long as that sound lasts, so the sound
+     * behind it does not overlap. The gap is held even when nothing is queued yet, so a sound arriving
+     * while one is still playing waits its turn too. An absent file — the normal state before the sound
+     * packs have finished downloading — leaves the notification silent rather than failing.
      */
-    private void playBlocking(SoundFile source, float gainDb) throws Exception {
-        Filepath file = source.resolve();
-        if (file == null || !file.isFile()) {
-            return;
+    private void drain() {
+        PendingSound pending;
+        synchronized (soundLock) {
+            pending = soundQueue.poll();
+            if (pending == null) {
+                // The gap after the last sound elapsed with nothing queued behind it.
+                soundPlaying = false;
+                nextDrain = null;
+                return;
+            }
         }
-        audioPlayer.play(file, gainDb);
-        Thread.sleep(durationMillis(file));
+
+        long spacing = 0;
+        try {
+            Filepath file = pending.source.resolve();
+            if (file != null && file.isFile()) {
+                audioPlayer.play(file, pending.gainDb);
+                spacing = durationMillis(file);
+            }
+        } catch (Exception ex) {
+            // An interrupt here is shutdownNow; the tail below then finds soundPlaying already cleared.
+            if (!Thread.currentThread().isInterrupted()) {
+                log.warn("Failed to play notification sound", ex);
+            }
+        }
+
+        synchronized (soundLock) {
+            if (soundPlaying) {
+                scheduleDrain(spacing);
+            }
+        }
     }
 
     /**
@@ -267,10 +315,18 @@ public class MazeEventNotificationOverlay {
         }
     }
 
-    /** Stops the sound thread; called when the plugin shuts down. */
-    public synchronized void shutdown() {
-        if (soundExecutor != null) {
-            soundExecutor.shutdownNow();
+    /** Stops the sound thread and drops whatever is still queued; called when the plugin shuts down. */
+    public void shutdown() {
+        synchronized (soundLock) {
+            soundQueue.clear();
+            soundPlaying = false;
+            if (nextDrain != null) {
+                nextDrain.cancel(false);
+                nextDrain = null;
+            }
+            if (soundExecutor != null) {
+                soundExecutor.shutdownNow();
+            }
         }
     }
 

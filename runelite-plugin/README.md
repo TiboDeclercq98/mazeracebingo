@@ -10,7 +10,7 @@ A RuneLite plugin that automatically tracks task progress for **Maze Race Bingo*
 - **Active tasks panel** — lists all unrevealed / incomplete tiles with progress bars at a glance
 - **Recent events feed** — shows the last 8 game events (tile completions, game-over, etc.) with colour-coded messages
 - **Chat notifications** — in-game messages when you contribute progress or complete a tile
-- **Sound alerts** — audio cues on tile completions and special events. The sound files are not bundled in the plugin; they download once on first startup into `.runelite/plugin-data/<plugin-name>/sounds`, so notifications are silent until that finishes. Drop your own `completion.wav` / `special.wav` / `success.wav` / `fail.wav` in that folder and pick the **Custom** pack to override them.
+- **Sound alerts** — audio cues on tile completions and special events. The sound files are not bundled in the plugin; they download once on first startup into `.runelite/plugin-data/mazeracebingo/sounds`, so notifications are silent until that finishes. Drop your own `completion.wav` / `special.wav` / `success.wav` / `fail.wav` in that folder and pick the **Custom** pack to override them.
 - **Live sync** — polls for state changes every 10 seconds so the map stays up to date when teammates complete tiles
 
 ## Supported task types
@@ -93,18 +93,18 @@ Sounds can be muted or have their volume adjusted in the plugin config panel. Th
 
 | Option | Behaviour |
 |--------|-----------|
-| Default | The four bundled category sounds shown in the table above. |
+| Meme | The four category sounds shown in the table above. |
 | Lore | A per-tile set: each maze tile plays its own numbered sound, with dedicated end-tile sounds. |
-| Custom | Your own files from `.runelite/mazebingo/sounds/`, falling back to the Default sound for any file you have not supplied. |
+| Custom | Your own files from the plugin's sounds folder, falling back to the Meme sound for any file you have not supplied. |
 
 **Lore** gives every tile its own sound instead of one shared "completion" cue:
 
 - Completing the tile numbered *N* on the map plays `lore/N.wav` (e.g. tile 3 → `3.wav`).
-- The end tile uses `lore/success.wav` when completed and `lore/fail.wav` on game over.
-- Key-found and keys-missing events are silent in this pack.
-- Any tile without a matching `N.wav` falls back to the Default *completion* sound, so you only need to provide sounds for the tiles you care about.
+- Completing the end tile plays `lore/success.wav`; trying to finish it without all the keys plays `lore/fail.wav`.
+- Booby-trap key-found events are silent in this pack.
+- Any tile without a matching `N.wav` falls back to the Meme *completion* sound, so only the tiles you care about need their own recording.
 
-To use **custom** sounds, select **Custom** and drop a `.wav` file named `success.wav`, `special.wav`, `fail.wav`, or `completion.wav` into `.runelite/mazebingo/sounds/` (created automatically on first plugin startup). Any file you omit falls back to the matching Default sound.
+To use **custom** sounds, select **Custom** and drop a `.wav` file named `success.wav`, `special.wav`, `fail.wav`, or `completion.wav` into the plugin's sounds folder (the exact path is logged on startup; sounds you previously kept in `.runelite/mazebingo/sounds/` are migrated there automatically). Any file you omit falls back to the matching Meme sound.
 
 ## Setup
 

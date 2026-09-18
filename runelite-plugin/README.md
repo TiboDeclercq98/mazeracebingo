@@ -11,7 +11,8 @@ A RuneLite plugin that automatically tracks task progress for **Maze Race Bingo*
 - **Recent events feed** — shows the last 8 game events (tile completions, game-over, etc.) with colour-coded messages
 - **Chat notifications** — in-game messages when you contribute progress or complete a tile
 - **Sound alerts** — audio cues on tile completions and special events. The sound files are not bundled in the plugin; they download once on first startup into `.runelite/plugin-data/mazeracebingo/sounds`, so notifications are silent until that finishes. Drop your own `completion.wav` / `special.wav` / `success.wav` / `fail.wav` in that folder and pick the **Custom** pack to override them.
-- **Live sync** — polls for state changes every 10 seconds so the map stays up to date when teammates complete tiles
+- **In-game pop-up** — a modal notification box in the game window carrying the event message, queued so that several events arriving at once are shown one at a time. Tile-completion pop-ups can be switched off with the **Tile completion pop-up** setting; game-over and keys-missing pop-ups always show.
+- **Live sync** — checks a lightweight state version every 10 seconds and refreshes the map immediately when a teammate changes anything, with a full refresh every 60 seconds as a fallback
 
 ## Supported task types
 
@@ -56,6 +57,16 @@ Tiles are revealed when they are the start tile, when they are completed, or whe
 
 ## UI panels
 
+### Panel header
+Sits above the map. Holds a **Refresh** button that re-fetches the maze state on demand, and a status indicator:
+
+| Status | Meaning |
+|--------|---------|
+| ● Connected (green) | The server answered and a team name is configured |
+| ● Disconnected (red) | The server could not be reached |
+| ● No team configured (red) | **Team Name** is still empty in the config panel |
+| ● Not connected (red) | Starting state, before the first fetch |
+
 ### Maze map
 A grid of clickable tiles. Click a tile to load its details in the tile info panel. Walls are drawn between completed tiles to indicate which passages are open.
 
@@ -76,6 +87,12 @@ Up to 8 recent events rendered below the map, colour-coded by type:
 - Red — keys missing
 - Green — game over
 - Gold — other events
+
+### Pop-up notifications
+
+Events also open a modal notification box in the game window showing the event message. Several events arriving together are queued and shown one after another. Only you see it.
+
+Turn off **Pop-up → Tile completion pop-up** in the config panel to suppress the pop-up for tile completions; game-over and keys-missing pop-ups are not affected.
 
 ## Chat & sound notifications
 
@@ -144,6 +161,14 @@ cd runelite-plugin
 ```
 
 The compiled JAR ends up in `build/libs/`. Load it as an external plugin in RuneLite's developer mode.
+
+To try a change without installing anything, launch a RuneLite dev client with the plugin already loaded:
+
+```bash
+./gradlew run
+```
+
+That runs `MazeBingoPluginTest`, which registers the plugin as a built-in and starts RuneLite with `--developer-mode --debug`.
 
 ## Author
 

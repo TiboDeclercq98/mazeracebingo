@@ -60,10 +60,10 @@ import java.util.stream.Collectors;
     name = "Maze Race Bingo",
     description = "Automatically tracks task progress for Maze Race Bingo",
     tags = {"maze", "race", "bingo", "tracker", "task"},
-    // Names the plugin data directory (.runelite/plugin-data/maze-race-bingo) that getPluginDirectory()
+    // Names the plugin data directory (.runelite/plugin-data/mazeracebingo) that getPluginDirectory()
     // hands to MazeSoundManager. Must stay identical to this plugin's manifest filename in the PluginHub
     // repository: changing it later would strand every user's downloaded sounds in the old folder.
-    internalName = "maze-race-bingo",
+    internalName = "mazeracebingo",
     // Custom sounds used to live in .runelite/mazebingo/sounds; RuneLite moves that whole folder into
     // the plugin data directory the first time getPluginDirectory() is called, so existing overrides
     // land where MazeSoundManager now looks for them.

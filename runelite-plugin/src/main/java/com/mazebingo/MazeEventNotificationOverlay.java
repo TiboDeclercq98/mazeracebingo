@@ -5,6 +5,7 @@ import net.runelite.api.WidgetNode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetModalMode;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.util.Filepath;
 import com.mazebingo.model.MazeEventEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,8 +18,7 @@ import javax.sound.sampled.Clip;
 import javax.sound.sampled.FloatControl;
 import javax.sound.sampled.LineEvent;
 import java.awt.Color;
-import java.io.File;
-import java.net.URL;
+import java.io.BufferedInputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -41,15 +41,24 @@ public class MazeEventNotificationOverlay {
     @Inject private Client client;
     @Inject private ClientThread clientThread;
     @Inject private MazeBingoConfig config;
+    @Inject private MazeSoundManager soundManager;
 
     // Notification sounds play on a dedicated single thread so that multiple tasks completed in one maze
     // refresh are announced one after another instead of overlapping. Each clip blocks its task until it
-    // finishes, so the executor's queue drains sequentially.
-    private final ExecutorService soundExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "maze-bingo-sound");
-        t.setDaemon(true);
-        return t;
-    });
+    // finishes, so the executor's queue drains sequentially. Created on demand rather than once: this
+    // singleton outlives a shutDown, so a plugin that is disabled and re-enabled needs a fresh thread.
+    private ExecutorService soundExecutor;
+
+    private synchronized ExecutorService soundExecutor() {
+        if (soundExecutor == null || soundExecutor.isShutdown()) {
+            soundExecutor = Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "maze-bingo-sound");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return soundExecutor;
+    }
 
     private WidgetNode popupWidgetNode;
     private final List<String> queue = new ArrayList<>();
@@ -105,8 +114,8 @@ public class MazeEventNotificationOverlay {
 
     /**
      * Meme/Custom packs pick one of four sounds from the event message. Custom plays the user's own
-     * file when present, otherwise falls through to the bundled Meme sound (classpathResource maps
-     * CUSTOM to the same folder as MEME).
+     * file when present, otherwise falls through to the downloaded Meme sound (packFile maps CUSTOM
+     * to the same folder as MEME).
      */
     private void playCategorySound(String message, MazeSoundPack pack, float gainDb) {
         String lowerMsg = message == null ? "" : message.toLowerCase();
@@ -118,12 +127,12 @@ public class MazeEventNotificationOverlay {
         // Resolution touches disk (custom sound lookup), so it runs on the sound thread rather than the caller.
         enqueue(() -> {
             if (pack == MazeSoundPack.CUSTOM) {
-                File custom = SoundGenerator.customFile(sound);
+                Filepath custom = soundManager.customFile(sound);
                 if (custom != null && custom.isFile()) {
-                    return AudioSystem.getAudioInputStream(custom);
+                    return openFile(custom);
                 }
             }
-            return openResource(SoundGenerator.classpathResource(pack, sound));
+            return openFile(soundManager.packFile(pack, sound));
         }, gainDb);
     }
 
@@ -131,8 +140,8 @@ public class MazeEventNotificationOverlay {
      * The Lore pack gives each maze tile its own numbered sound (tile N -> lore/N.wav) and uses dedicated
      * end-tile sounds. The backend emits exactly one "gameover" event, and only when the end tile is
      * completed, so gameover is always the WIN. A keys-missing event (trying to finish without all keys) is
-     * the fail case. Booby-trap "key found" events are intentionally silent. Any tile without a bundled Lore
-     * file falls back to the matching Meme category sound.
+     * the fail case. Booby-trap "key found" events are intentionally silent. Any tile without a Lore file
+     * of its own falls back to the matching Meme category sound.
      */
     private void playLoreSound(MazeEventEntry event, float gainDb) {
         final String loreFilename;
@@ -154,16 +163,14 @@ public class MazeEventNotificationOverlay {
         }
 
         enqueue(() -> {
-            String lore = SoundGenerator.loreResourceIfPresent(loreFilename);
-            return openResource(lore != null
-                ? lore
-                : SoundGenerator.classpathResource(MazeSoundPack.MEME, fallback));
+            Filepath lore = soundManager.loreFileIfPresent(loreFilename);
+            return openFile(lore != null ? lore : soundManager.packFile(MazeSoundPack.MEME, fallback));
         }, gainDb);
     }
 
     /** Queues a sound for sequential playback on the sound thread. */
     private void enqueue(AudioSource source, float gainDb) {
-        soundExecutor.submit(() -> {
+        soundExecutor().submit(() -> {
             try {
                 playBlocking(source, gainDb);
             } catch (Exception ex) {
@@ -198,12 +205,23 @@ public class MazeEventNotificationOverlay {
         }
     }
 
-    private static AudioInputStream openResource(String resource) throws Exception {
-        if (resource == null) {
+    /**
+     * Opens one sound file, or returns null when it is absent — which is the normal state before the
+     * sound packs have finished downloading, and leaves the notification silent rather than failing.
+     */
+    private static AudioInputStream openFile(Filepath file) throws Exception {
+        if (file == null || !file.isFile()) {
             return null;
         }
-        URL url = SoundGenerator.class.getResource(resource);
-        return url == null ? null : AudioSystem.getAudioInputStream(url);
+        // AudioSystem sniffs the format by reading ahead and rewinding, so it needs mark/reset support.
+        BufferedInputStream stream = new BufferedInputStream(file.openInputStream());
+        try {
+            return AudioSystem.getAudioInputStream(stream);
+        } catch (Exception ex) {
+            // The sounds come off the network now, so a truncated file is possible; don't leak its handle.
+            stream.close();
+            throw ex;
+        }
     }
 
     private static void setGain(Clip clip, float gainDb) {
@@ -215,8 +233,10 @@ public class MazeEventNotificationOverlay {
     }
 
     /** Stops the sound thread; called when the plugin shuts down. */
-    public void shutdown() {
-        soundExecutor.shutdownNow();
+    public synchronized void shutdown() {
+        if (soundExecutor != null) {
+            soundExecutor.shutdownNow();
+        }
     }
 
     private synchronized boolean tryClearMessage() {

@@ -62,8 +62,10 @@ public interface MazeBingoConfig extends Config {
     @ConfigItem(
         keyName = "soundPack",
         name = "Sound files",
-        description = "Which set of notification sounds to use. Custom plays your own files from "
-            + ".runelite/mazebingo/sounds, falling back to the Meme sound for any file you have not provided.",
+        description = "Which set of notification sounds to use. Sound files download on first startup, so "
+            + "notifications are silent until that finishes. Custom plays your own files from the plugin's "
+            + "sounds folder (the exact path is logged on startup), falling back to the Meme sound for any "
+            + "file you have not provided.",
         section = "sounds",
         position = 5
     )

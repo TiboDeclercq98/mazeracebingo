@@ -10,7 +10,7 @@ A RuneLite plugin that automatically tracks task progress for **Maze Race Bingo*
 - **Active tasks panel** — lists all unrevealed / incomplete tiles with progress bars at a glance
 - **Recent events feed** — shows the last 8 game events (tile completions, game-over, etc.) with colour-coded messages
 - **Chat notifications** — in-game messages when you contribute progress or complete a tile
-- **Sound alerts** — audio cues on tile completions and special events
+- **Sound alerts** — audio cues on tile completions and special events. The sound files are not bundled in the plugin; they download once on first startup into `.runelite/plugin-data/<plugin-name>/sounds`, so notifications are silent until that finishes. Drop your own `completion.wav` / `special.wav` / `success.wav` / `fail.wav` in that folder and pick the **Custom** pack to override them.
 - **Live sync** — polls for state changes every 10 seconds so the map stays up to date when teammates complete tiles
 
 ## Supported task types

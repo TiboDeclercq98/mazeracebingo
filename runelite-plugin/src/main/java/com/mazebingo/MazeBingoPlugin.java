@@ -39,6 +39,7 @@ import net.runelite.client.config.ConfigManager;
 import com.google.inject.Provides;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -58,7 +59,11 @@ import java.util.stream.Collectors;
 @PluginDescriptor(
     name = "Maze Race Bingo",
     description = "Automatically tracks task progress for Maze Race Bingo",
-    tags = {"maze", "race", "bingo", "tracker", "task"}
+    tags = {"maze", "race", "bingo", "tracker", "task"},
+    // Custom sounds used to live in .runelite/mazebingo/sounds; RuneLite moves that whole folder into
+    // the plugin data directory the first time getPluginDirectory() is called, so existing overrides
+    // land where MazeSoundManager now looks for them.
+    legacyDataDirectory = "mazebingo"
 )
 public class MazeBingoPlugin extends Plugin {
 
@@ -97,6 +102,7 @@ public class MazeBingoPlugin extends Plugin {
     @Inject private ItemManager itemManager;
     @Inject private ChatMessageManager chatMessageManager;
     @Inject private MazeEventNotificationOverlay notifOverlay;
+    @Inject private MazeSoundManager soundManager;
 
     private final List<ActiveTile> activeTiles = new CopyOnWriteArrayList<>();
     private volatile Map<String, String> tileDescriptions = new HashMap<>();
@@ -133,7 +139,14 @@ public class MazeBingoPlugin extends Plugin {
 
     @Override
     protected void startUp() {
-        SoundGenerator.ensureSoundsDirExists();
+        try {
+            soundManager.init(getPluginDirectory());
+            soundManager.ensureDownloaded();
+        } catch (IOException e) {
+            // Sounds are a nicety; everything else about the plugin still works without them.
+            log.warn("Could not open the plugin directory; notification sounds are unavailable", e);
+        }
+
         executor = Executors.newSingleThreadScheduledExecutor();
         panel.setOnRefresh(() -> executor.execute(this::refreshMazeState));
         panel.setOnTileClick(tile -> {
